@@ -1,0 +1,1874 @@
+
+
+(*===========================================================================*)
+
+let print_typed_var fmt tm =
+      let s,ty = dest_var tm in
+      pp_print_string fmt ("("^s^":"^string_of_type ty^")") in
+    install_user_printer("print_typed_var",print_typed_var);;
+
+
+(*----For deleting type-----------*)
+
+delete_user_printer "print_typed_var";;
+
+(*===========================================================================*)
+
+(*===========================================================================*)
+(*         Formalization of Macro-Mini Robotic System 
+                                for Physical Human Robot Interaction         *)
+(*===========================================================================*)
+
+(*---------------------------------------------------------------------------*)
+(*---------------------------------------------------------------------------*)
+(*            Parameters of the 1-dof macro-mini robotic system              *)
+(*---------------------------------------------------------------------------*)
+(*
+new_type_abbrev ("post_mini_macro",`:real^1 -> complex`);;  (*=x1, Position of the mini robot with respect to the macro robot, which is a function of time=*)
+new_type_abbrev ("post_macro_base",`:real^1 -> complex`);;  (*=x2, Position of the macro robot with respect to the base frame, which is a function of time=*)
+new_type_abbrev ("post_mini_base",`:real^1 -> complex`);;  (*=x3, Position of the mini robot with respect to the base frame, which is a function of time=*)
+*)
+
+new_type_abbrev ("post_func",`:real^1 -> complex`);;  (*=Position function, which can be used to define the relative positions of the macro and mini robots=*)
+
+
+(*
+new_type_abbrev ("actu_force_macro",`:real^1 -> complex`);;  (*=f1, Actuator force of the macro robot, which is a function of time=*)
+new_type_abbrev ("actu_force_mini",`:real^1 -> complex`);;  (*=f2, Actuator force of the mini robot, which is a function of time=*)
+new_type_abbrev ("human_user_force",`:real^1 -> complex`);;  (*=fh, Force applied on the mini by the human user=*)
+*)
+
+new_type_abbrev ("force_func",`:real^1 -> complex`);;  (*=Type of Force function, which can be used to define the actuator forces of the macro and mini robots and human user force=*)
+
+
+new_type_abbrev ("m1",`:real`);;  (*=Moving mass of the macro=*)
+new_type_abbrev ("m2",`:real`);;  (*=Moving mass of the mini=*)
+new_type_abbrev 
+     ("mov_masses_macro_mini",`:m1 # m2`);;  (*==Moving masses of the macro and mini robots==*)
+
+
+let valid_macro_mini_rob_sys = new_definition 
+   `valid_macro_mini_rob_sys ((m1,m2):mov_masses_macro_mini)
+    = ((&0 < m1) /\ (&0 < m2))`;;
+
+
+(* ------------------------------------------------------------------------- *)
+(*       Modeling one-dimensional Dynamical Equation for Mini Robot          *)
+(* ------------------------------------------------------------------------- *)
+
+(*==This equation is taken from the Laplace transform file and is already stored in the shell==*)
+
+(*
+
+ let diff_eq_n_order = new_definition
+    `diff_eq_n_order n (lst:complex list) (f:real^1->complex) t = 
+  (vsum (0..n) (\k. (EL k lst) * (higher_vector_derivative k f t)))`;; 
+
+*)
+
+
+%let lst_fh_fun = new_definition `  
+%    lst_fh_fun = [Cx (&1)]`;;
+
+%let lst_f2_fun = new_definition `  
+%    lst_f2_fun = [Cx (&1)]`;;
+
+let lst_x3_fun = new_definition `  
+    lst_x3_fun ((m1,m2):mov_masses_macro_mini) = [Cx (&0); Cx (&1); Cx m2]`;;
+
+
+let dyn_eq_mini_1d = new_definition
+    `dyn_eq_mini_1d (fh:force_func) (f2:force_func) (x3:post_func) ((m1,m2):mov_masses_macro_mini) t  = 
+          (fh t + f2 t = diff_eq_n_order 2 (lst_x3_fun (m1,m2)) x t)`;; 
+
+
+g `!fh f2 x3 m1 m2 t.
+    dyn_eq_mini_1d (fh:force_func) (f2:force_func) (x3:post_func) ((m1,m2):mov_masses_macro_mini) t =
+     (fh t + f2 t = Cx m2 * (vector_derivative (\t. vector_derivative x3 (at t)) (at t))`;;
+
+e (REPEAT STRIP_TAC);;
+e (REWRITE_TAC [dyn_eq_mini_1d]);;
+e (REWRITE_TAC [lst_x3_fun]);;
+e (REWRITE_TAC [diff_eq_n_order]);;
+e (REWRITE_TAC [VSUM_22; EL]);;
+e (REWRITE_TAC [HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (SIMP_TAC [ETA_AX]);;
+e (SUBGOAL_THEN `higher_vector_derivative 2 (x3:real^1->complex) t = 
+                       vector_derivative (\t. vector_derivative x3 (at t)) (at t)` ASSUME_TAC);;
+      e (REWRITE_TAC [ARITH_RULE `2 = SUC 1`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (SIMP_TAC [ETA_AX]);;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (REWRITE_TAC [ARITH_RULE `2 = SUC 1`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (CONV_TAC COMPLEX_FIELD);;
+
+let DYN_EQ_MINI_1D_EQUIV_THM = top_thm ();;
+
+(* ------------------------------------------------------------------------- *)
+(*       Modeling one-dimensional Dynamical Equation for Macro Robot         *)
+(* ------------------------------------------------------------------------- *)
+
+let lst_x1_fun = new_definition `  
+    lst_x1_fun ((m1,m2):mov_masses_macro_mini) = [Cx (&0); Cx (&1); Cx m1]`;;
+
+
+let dyn_eq_macro_1d = new_definition
+    `dyn_eq_macro_1d (f1:force_func) (f2:force_func) (x1:post_func) ((m1,m2):mov_masses_macro_mini) t  = 
+          (f1 t + f2 t = diff_eq_n_order 2 (lst_x1_fun (m1,m2)) x t)`;; 
+
+
+g `!f1 f2 x1 m1 m2 t.
+    dyn_eq_macro_1d (f1:force_func) (f2:force_func) (x1:post_func) ((m1,m2):mov_masses_macro_mini) t =
+     (f1 t + f2 t = Cx m1 * (vector_derivative (\t. vector_derivative x1 (at t)) (at t))`;;
+
+e (REPEAT STRIP_TAC);;
+e (REWRITE_TAC [dyn_eq_macro_1d]);;
+e (REWRITE_TAC [lst_x1_fun]);;
+e (REWRITE_TAC [diff_eq_n_order]);;
+e (REWRITE_TAC [VSUM_22; EL]);;
+e (REWRITE_TAC [HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (SIMP_TAC [ETA_AX]);;
+e (SUBGOAL_THEN `higher_vector_derivative 2 (x1:real^1->complex) t = 
+                       vector_derivative (\t. vector_derivative x1 (at t)) (at t)` ASSUME_TAC);;
+      e (REWRITE_TAC [ARITH_RULE `2 = SUC 1`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (SIMP_TAC [ETA_AX]);;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (REWRITE_TAC [ARITH_RULE `2 = SUC 1`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (CONV_TAC COMPLEX_FIELD);;
+
+let DYN_EQ_MACRO_1D_EQUIV_THM = top_thm ();;
+
+(* ------------------------------------------------------------------------- *)
+(* ------------------------------------------------------------------------- *)
+
+(*==Now we have to model the relative positions of the macro and mini robots in the s domain, which is the laplace transform of the corresponding dynamical equations==*)
+
+(* ------------------------------------------------------------------------- *)
+
+
+let transfer_function = new_definition 
+   `transfer_function s (x:real^1->complex) (y:real^1->complex) 
+    = (laplace_transform y s / laplace_transform x s)`;;
+
+
+(*--This is the definition of the Laplace transform of the dynamical equation for the mini robot and its associated lemma--*)
+
+
+let lap_tran_dyn_eq_mini_1d = new_definition
+    `lap_tran_dyn_eq_mini_1d (fh:force_func) (f2:force_func) (x3:post_func) ((m1,m2):mov_masses_macro_mini) s  = 
+          (laplace_transform fh s - laplace_transform f2 s  = laplace_transform (\t. diff_eq_n_order 2 (lst_x3_fun (m1,m2)) x t) s)`;; 
+
+
+(*==Thoerem titled "LAPLACE_OF_DIFF_EQ_ZERO_INIT_SECOND" is already available in the Laplace transform library==*)
+
+g `!(x3:dist_fun) m1 m2 s.
+  laplace_exists_higher_deriv 2 x3 s /\
+  (!t. differentiable_higher_derivative 2 x3 t) /\
+  (zero_initial_conditions 1 x3)
+ ==> laplace_transform (\t. diff_eq_n_order 2 (lst_x3_fun ((m1,m2):mov_masses_macro_mini)) x t) s =
+   ((laplace_transform x3 s) * vsum (0..2) (\i. (EL i (lst_x3_fun (m1,m2)))  * (s pow i) ))`;;
+
+e (REPEAT STRIP_TAC);;
+e (MATCH_MP_TAC LAPLACE_OF_DIFF_EQ_ZERO_INIT_SECOND);;
+e (ASM_SIMP_TAC []);;
+e (POP_ASSUM MP_TAC THEN REWRITE_TAC [ARITH_RULE `2 - 1 = 1`; ARITH_RULE `0 < 2`]);;
+
+let LAPLACE_OF_RHS_DYN_EQ_MINI_GEN = top_thm ();;
+
+
+g `!(x3:dist_fun) m1 m2 s.
+  laplace_exists_higher_deriv 2 x3 s /\
+  (!t. differentiable_higher_derivative 2 x3 t) /\
+  (zero_initial_conditions 1 x3)
+ ==> laplace_transform (\t. diff_eq_n_order 2 (lst_x3_fun ((m1,m2):mov_masses_macro_mini)) x t) s =
+   ((laplace_transform x3 s) * Cx m1 * (s pow 2))`;;
+
+e (REPEAT STRIP_TAC);;
+e (MATCH_MP_TAC LAPLACE_OF_DIFF_EQ_ZERO_INIT_SECOND);;
+e (ASM_SIMP_TAC []);;
+e (POP_ASSUM MP_TAC THEN REWRITE_TAC [ARITH_RULE `2 - 1 = 1`; ARITH_RULE `0 < 2`]);;
+
+let LAPLACE_OF_RHS_DYN_EQ_MINI = top_thm ();;
+
+
+
+g `!fh f2 x3 m1 m2 t.
+    dyn_eq_mini_1d (fh:force_func) (f2:force_func) (x3:post_func) ((m1,m2):mov_masses_macro_mini) t =
+     (fh t + f2 t = Cx m2 * (vector_derivative (\t. vector_derivative x3 (at t)) (at t))`;;
+
+
+
+let lap_tran_dyn_eq_mini_1d = new_definition
+    `lap_tran_dyn_eq_mini_1d (fh:force_func) (f2:force_func) (x3:post_func) ((m1,m2):mov_masses_macro_mini) s  = 
+          (laplace_transform fh s - laplace_transform f2 s  = laplace_transform (\t. diff_eq_n_order 2 (lst_x3_fun (m1,m2)) x t) s)`;; 
+
+
+g `!m1 m2 (fh:force_fun) (f2:force_fun) (x3:post_func) s.
+   valid_macro_mini_rob_sys ((m1,m2):mov_masses_macro_mini) /\
+   (!t. differentiable_higher_derivative 2 x3 t) /\  
+   (!t. differentiable_higher_derivative 0 fh t) /\
+   (!t. differentiable_higher_derivative 0 f2 t) /\
+   (laplace_exists_higher_deriv 2 x3 s) /\ 
+   (laplace_exists_higher_deriv 0 fh s) /\
+   (laplace_exists_higher_deriv 0 f2 s) /\
+    zero_initial_conditions 1 x3 /\
+   (!t. dyn_eq_mini_1d fh f2 x3 (m1,m2) t)
+    ==> 
+     lap_tran_dyn_eq_mini_1d fh f2 x3 (m1,m2) s`;;
+
+e (REWRITE_TAC [valid_macro_mini_rob_sys; dyn_eq_mini_1d; tf_fm_admit_eq; lap_tran_dyn_eq_mini_1d]);;
+e (REPEAT STRIP_TAC);;
+
+(*==Generate its proof later==*)
+
+e (SUBGOAL_THEN
+    `s * (Cx m * s + Cx c) = 
+      vsum (0..2) (\i. (EL i (lst_x_fm_fun (m,c,k))) * s pow i)`
+    ASSUME_TAC);;
+      e (TF_SUM_SIMP lst_x_fm_fun);;
+      e (SIMP_TAC [CX_ADD; CX_SUB; CX_MUL; CX_DIV] THEN TF_POW_SIMP complex_pow THEN CONV_TAC COMPLEX_FIELD);;
+
+e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (SUBGOAL_THEN
+    `Cx (&1) = 
+      vsum (0..0) (\i. (EL i lst_FH_fm_fun) * s pow i)`
+    ASSUME_TAC);;
+      e (TF_SUM_SIMP lst_FH_fm_fun);;
+      e (TF_POW_SIMP complex_pow THEN CONV_TAC COMPLEX_FIELD);;
+
+e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (MATCH_MP_TAC TRANSFER_FUNCTION_OF_N_ORDER_SYS_ALT_SECOND);;
+e (TF_ARITH_TAC THEN ASM_SIMP_TAC [diff_eq_n_order_sys] THEN ARITH_TAC);;
+
+let LAPLACE_OF_DYN_EQ_MINI = top_thm ();;
+
+(* ------------------------------------------------------------------------- *)
+
+(* ------------------------------------------------------------------------- *)
+(*             4.1 Controller of the Macro Robot                             *)
+(* ------------------------------------------------------------------------- *)
+
+(*==== f1d = k1p (x3 −x1) + k1d (x˙3 − x˙1) + f2d ===*)
+
+
+new_type_abbrev ("mr",`:real`);;  (*=Virtual Mass=*)
+new_type_abbrev ("cr",`:real`);;  (*=Virtual Damping to the human user=*)
+
+
+let valid_macro_mini_cntlr = new_definition 
+   `valid_macro_mini_cntlr k1p k1d mr cr
+    = ((&0 < k1p) /\ (&0 < k1d) /\ (&0 < mr) /\ (&0 < cr))`;;
+
+
+let lst_cntlr_macro_x1_fun = new_definition `  
+    lst_cntlr_macro_x1_fun k1p k1d = [-- Cx (k1p); -- Cx (k1d)]`;;
+
+let lst_cntlr_macro_x3_fun = new_definition `  
+    lst_cntlr_macro_x3_fun k1p k1d = [Cx (k1p); Cx (k1d)]`;;
+
+
+let dyn_cntlr_macro_1d = new_definition
+    `dyn_cntlr_macro_1d (f1d:force_func) (f2d:force_func) (x1:post_func) (x3:post_func) k1p k1d t  = 
+          (f1d t = diff_eq_n_order 2 (lst_cntlr_macro_x1_fun k1p k1d) x1 t + diff_eq_n_order 2 (lst_cntlr_macro_x3_fun k1p k1d) x3 t + f2d t)`;; 
+
+
+g `!fh f2 x3 m1 m2 t.
+    dyn_cntlr_macro_1d (f1d:force_func) (f2d:force_func) (x1:post_func) (x3:post_func) k1p k1d t =
+     (f1d t = Cx k1p * (x3 t - x1 t) + Cx k1d * ((vector_derivative x3 (at t)) - (vector_derivative x1 (at t))) + f2d t)`;;
+
+e (REPEAT STRIP_TAC);;
+e (REWRITE_TAC [dyn_cntlr_macro_1d]);;
+e (REWRITE_TAC [lst_cntlr_macro_x1_fun; lst_cntlr_macro_x3_fun]);;
+e (REWRITE_TAC [diff_eq_n_order]);;
+e (REWRITE_TAC [VSUM_22; EL]);;
+e (REWRITE_TAC [HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (SIMP_TAC [ETA_AX]);;
+e (SUBGOAL_THEN `higher_vector_derivative 1 (x3:real^1->complex) t = 
+                       vector_derivative x3 (at t)` ASSUME_TAC);;
+      e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (SIMP_TAC [ETA_AX]);;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (SUBGOAL_THEN `higher_vector_derivative 1 (x1:real^1->complex) t = 
+                       vector_derivative x1 (at t)` ASSUME_TAC);;
+      e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (SIMP_TAC [ETA_AX]);;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (CONV_TAC COMPLEX_FIELD);;
+
+let DYN_CONTLR_MACRO_EQUIV_THM = top_thm ();;
+
+
+
+(* ------------------------------------------------------------------------- *)
+(*             4.2 Controller of the Mini Robot                              *)
+(* ------------------------------------------------------------------------- *)
+
+(*==== f2d = (m2 − mr) x¨3 − cr x˙3 ===*)
+
+
+let lst_cntlr_mini_x3_fun = new_definition `  
+    lst_cntlr_mini_x3_fun (m1,m2) mr cr = [Cx (&0); Cx (cr); Cx (m2) - Cx (mr)]`;;
+
+
+let dyn_cntlr_mini_1d = new_definition
+    `dyn_cntlr_mini_1d (f2d:force_func) (x3:post_func) m1 m2 mr cr t  = 
+          (f2d t = diff_eq_n_order 2 (lst_cntlr_mini_x3_fun (m1,m2) mr cr) x3 t)`;; 
+
+
+g `!fh f2 x3 m1 m2 t.
+    dyn_cntlr_mini_1d (f2d:force_func) (x3:post_func) m1 m2 mr cr t =
+     (f2d t = (Cx m2 - Cx mr) * (vector_derivative (\t. vector_derivative x3 (at t)) (at t)) - Cx cr * (vector_derivative x3 (at t)))`;;
+
+e (REPEAT STRIP_TAC);;
+e (REWRITE_TAC [dyn_cntlr_mini_1d]);;
+e (REWRITE_TAC [lst_cntlr_mini_x3_fun]);;
+e (REWRITE_TAC [diff_eq_n_order]);;
+e (REWRITE_TAC [VSUM_22; EL]);;
+e (REWRITE_TAC [HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (SIMP_TAC [ETA_AX]);;
+e (SUBGOAL_THEN `higher_vector_derivative 2 (x3:real^1->complex) t = 
+                       vector_derivative (\t. vector_derivative x3 (at t)) (at t)` ASSUME_TAC);;
+      e (REWRITE_TAC [ARITH_RULE `2 = SUC 1`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (SIMP_TAC [ETA_AX]);;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (REWRITE_TAC [ARITH_RULE `2 = SUC 1`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (CONV_TAC COMPLEX_FIELD);;
+
+
+let DYN_CONTLR_MINI_EQUIV_THM = top_thm ();;
+
+
+
+
+(* ------------------------------------------------------------------------- *)
+(*          4.3 Closed-Loop Behaviour of the Macro-Mini Robot                *)
+(* ------------------------------------------------------------------------- *)
+
+(*==== X1 = [ (k1d s + k1p)  / (m1 s^2 + kd s + k1p) ] * X3 ===*)
+
+
+let lst_cntlr_macro_cl_x3_fun = new_definition `  
+    lst_cntlr_macro_cl_x3_fun k1d k1p = [Cx k1p; Cx k1d]`;;
+
+let lst_cntlr_macro_cl_x1_fun = new_definition `  
+    lst_cntlr_macro_cl_x1_fun (m1,m2) k1d k1p kd = [Cx k1p; Cx kd; Cx m1]`;;
+
+let dyn_cntlr_macro_cl_1d = new_definition
+    `dyn_cntlr_macro_cl_1d (x1:force_func) (x3:post_func) m1 m2 k1d k1p kd t  = 
+          (diff_eq_n_order 2 (lst_cntlr_macro_cl_x1_fun (m1,m2) k1d k1p kd) x1 t = 
+		   diff_eq_n_order 1 (lst_cntlr_macro_cl_x3_fun k1d k1p) x3 t)`;; 
+
+
+g `!fh f2 x3 m1 m2 t.
+    dyn_cntlr_macro_cl_1d (x1:force_func) (x3:post_func) m1 m2 k1d k1p kd t =
+     (Cx m1 * (vector_derivative (\t. vector_derivative x1 (at t)) (at t)) + Cx kd * (vector_derivative x1 (at t)) + k1p * x1 t = 
+	  Cx k1d * (vector_derivative x3 (at t)) + Cx k1p * x3 t)`;;
+
+e (REPEAT STRIP_TAC);;
+e (REWRITE_TAC [dyn_cntlr_macro_cl_1d]);;
+e (REWRITE_TAC [lst_cntlr_macro_cl_x1_fun; lst_cntlr_macro_cl_x3_fun]);;
+e (REWRITE_TAC [diff_eq_n_order]);;
+e (REWRITE_TAC [VSUM_22; EL]);;
+e (REWRITE_TAC [HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (SIMP_TAC [ETA_AX]);;
+e (SUBGOAL_THEN `higher_vector_derivative 2 (x3:real^1->complex) t = 
+                       vector_derivative (\t. vector_derivative x3 (at t)) (at t)` ASSUME_TAC);;
+      e (REWRITE_TAC [ARITH_RULE `2 = SUC 1`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (SIMP_TAC [ETA_AX]);;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (REWRITE_TAC [ARITH_RULE `2 = SUC 1`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (CONV_TAC COMPLEX_FIELD);;
+
+
+let DYN_CONTLR_CL_MACRO_EQUIV_THM = top_thm ();;
+
+
+(*==Here, I have to define the transfer function for closed-loop representation of the macro-robot and verify it using its dynamic representation==*)
+
+
+let tf_cntlr_macro_cl = new_definition 
+   `tf_cntlr_macro_cl (x1:force_func) (x3:post_func) m1 m2 k1d k1p kd s
+    = ( transfer_function s x1 x3 = 
+    ((Cx k1d * s + k1p) / (Cx m1 * s pow 2 + Cx k1d * s + k1p)) )`;;
+
+
+g `!m1 m2 (x1:force_func) (x3:post_func) k1d k1p kd s.
+   valid_macro_mini_rob_sys ((m1,m2):mov_masses_macro_mini) /\
+   (!t. differentiable_higher_derivative 2 x1 t) /\  
+   (!t. differentiable_higher_derivative 1 x3 t) /\
+   (laplace_exists_higher_deriv 2 x1 s) /\ 
+   (laplace_exists_higher_deriv 1 x3 s) /\
+    zero_initial_conditions 1 x1 /\
+    zero_initial_conditions 0 x3 /\
+  ~(laplace_transform fH s = Cx (&0)) /\
+  ~((Cx m1 * s pow 2 + Cx k1d * s + k1p) = Cx (&0)) /\
+   (!t. dyn_cntlr_macro_cl_1d x1 x3 m1 m2 k1d k1p kd t)
+    ==> 
+     tf_cntlr_macro_cl x1 x3 m1 m2 k1d k1p kd s`;;
+
+e (REWRITE_TAC [valid_macro_mini_rob_sys; dyn_cntlr_macro_cl_1d; tf_cntlr_macro_cl; transfer_function]);;
+e (REPEAT STRIP_TAC THEN
+  ASM_SIMP_TAC
+    [COMPLEX_FIELD
+       `! a b c d. ~(d = Cx (&0)) /\  ~(b = Cx (&0)) ==> ( (a / b = c / d ) = (a * d = b * c ))`]);;
+e (SUBGOAL_THEN
+    `s * (Cx m * s + Cx c) = 
+      vsum (0..2) (\i. (EL i (lst_x_fm_fun (m,c,k))) * s pow i)`
+    ASSUME_TAC);;
+      e (TF_SUM_SIMP lst_x_fm_fun);;
+      e (SIMP_TAC [CX_ADD; CX_SUB; CX_MUL; CX_DIV] THEN TF_POW_SIMP complex_pow THEN CONV_TAC COMPLEX_FIELD);;
+
+e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (SUBGOAL_THEN
+    `Cx (&1) = 
+      vsum (0..0) (\i. (EL i lst_FH_fm_fun) * s pow i)`
+    ASSUME_TAC);;
+      e (TF_SUM_SIMP lst_FH_fm_fun);;
+      e (TF_POW_SIMP complex_pow THEN CONV_TAC COMPLEX_FIELD);;
+
+e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (MATCH_MP_TAC TRANSFER_FUNCTION_OF_N_ORDER_SYS_ALT_SECOND);;
+e (TF_ARITH_TAC THEN ASM_SIMP_TAC [diff_eq_n_order_sys] THEN ARITH_TAC);;
+
+let TF_CONTLR_CL_MACRO = top_thm ();;
+
+(*------------------------------------------------------------------------*)
+
+(*==== X3 = [ 1  / (mr s^2 + cr s) ] * fh ===*)
+
+
+let lst_cntlr_mini_cl_x3_fun = new_definition `  
+    lst_cntlr_mini_cl_x3_fun mr cr = [Cx (&0); Cx cr; Cx mr]`;;
+
+let lst_cntlr_mini_cl_fh_fun = new_definition `  
+    lst_cntlr_mini_cl_fh_fun = [Cx (&0)]`;;
+
+let dyn_cntlr_mini_cl_1d = new_definition
+    `dyn_cntlr_mini_cl_1d (fh:force_func) (x3:post_func) mr cr t  = 
+          (diff_eq_n_order 2 (lst_cntlr_mini_cl_x3_fun mr cr) x3 t = 
+		   diff_eq_n_order 0 (lst_cntlr_mini_cl_fh_fun) fh t)`;; 
+
+
+g `!fh x3 mr cr t.
+    dyn_cntlr_mini_cl_1d (fh:force_func) (x3:post_func) mr cr t =
+     (Cx mr * (vector_derivative (\t. vector_derivative x3 (at t)) (at t)) + Cx cr * (vector_derivative x3 (at t)) = 
+	  fh t)`;;
+
+e (REPEAT STRIP_TAC);;
+e (REWRITE_TAC [dyn_cntlr_mini_cl_1d]);;
+e (REWRITE_TAC [lst_cntlr_mini_cl_fh_fun; lst_cntlr_mini_cl_x3_fun]);;
+e (REWRITE_TAC [diff_eq_n_order]);;
+e (REWRITE_TAC [VSUM_22; EL]);;
+e (REWRITE_TAC [HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (SIMP_TAC [ETA_AX]);;
+e (SUBGOAL_THEN `higher_vector_derivative 2 (x3:real^1->complex) t = 
+                       vector_derivative (\t. vector_derivative x3 (at t)) (at t)` ASSUME_TAC);;
+      e (REWRITE_TAC [ARITH_RULE `2 = SUC 1`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+      e (REWRITE_TAC [higher_vector_derivative]);;
+      e (SIMP_TAC [ETA_AX]);;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+
+e (ASM_SIMP_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (REWRITE_TAC [ARITH_RULE `2 = SUC 1`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (REWRITE_TAC [ARITH_RULE `1 = SUC 0`]);;
+e (REWRITE_TAC [EL; higher_vector_derivative; TL; HD]);;
+e (CONV_TAC COMPLEX_FIELD);;
+
+
+let DYN_CONTLR_CL_MINI_EQUIV_THM = top_thm ();;
+
+
+(*===================================================================================*)
+
+
+(*==Here, I have to define the transfer function for closed-loop representation of the mini robot and verify it using its dynamic representation==*)
+
+
+let tf_cntlr_mini_cl = new_definition 
+   `tf_cntlr_mini_cl (fh:force_func) (x3:post_func) mr cr s
+    = ( transfer_function s fh x3 = 
+    (Cx (&1) / (Cx mr * s pow 2 + Cx cr * s)) )`;;
+
+
+g `!m1 m2 (fh:force_func) (x3:post_func) mr cr s.
+   valid_macro_mini_rob_sys ((m1,m2):mov_masses_macro_mini) /\
+   (!t. differentiable_higher_derivative 2 x3 t) /\  
+   (!t. differentiable_higher_derivative 0 fh t) /\
+   (laplace_exists_higher_deriv 2 x3 s) /\ 
+   (laplace_exists_higher_deriv 0 fh s) /\
+    zero_initial_conditions 1 x3 /\
+  ~(laplace_transform fH s = Cx (&0)) /\
+  ~((Cx mr * s pow 2 + Cx cr * s) = Cx (&0)) /\
+   (!t. dyn_cntlr_mini_cl_1d fh x3 mr cr t)
+    ==> 
+     tf_cntlr_mini_cl fh x3 mr cr s`;;
+
+e (REWRITE_TAC [valid_macro_mini_rob_sys; dyn_cntlr_mini_cl_1d; tf_cntlr_mini_cl; transfer_function]);;
+e (REPEAT STRIP_TAC THEN
+  ASM_SIMP_TAC
+    [COMPLEX_FIELD
+       `! a b c d. ~(d = Cx (&0)) /\  ~(b = Cx (&0)) ==> ( (a / b = c / d ) = (a * d = b * c ))`]);;
+e (SUBGOAL_THEN
+    `s * (Cx m * s + Cx c) = 
+      vsum (0..2) (\i. (EL i (lst_cntlr_mini_cl_x3_fun mr cr)) * s pow i)`
+    ASSUME_TAC);;
+      e (TF_SUM_SIMP lst_cntlr_mini_cl_x3_fun);;
+      e (SIMP_TAC [CX_ADD; CX_SUB; CX_MUL; CX_DIV] THEN TF_POW_SIMP complex_pow THEN CONV_TAC COMPLEX_FIELD);;
+
+e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (SUBGOAL_THEN
+    `Cx (&1) = 
+      vsum (0..0) (\i. (EL i lst_cntlr_mini_cl_fh_fun) * s pow i)`
+    ASSUME_TAC);;
+      e (TF_SUM_SIMP lst_cntlr_mini_cl_fh_fun);;
+      e (TF_POW_SIMP complex_pow THEN CONV_TAC COMPLEX_FIELD);;
+
+e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (MATCH_MP_TAC TRANSFER_FUNCTION_OF_N_ORDER_SYS_ALT_SECOND);;
+e (TF_ARITH_TAC THEN ASM_SIMP_TAC [diff_eq_n_order_sys] THEN ARITH_TAC);;
+
+let TF_CONTLR_CL_MINI = top_thm ();;
+
+
+(* ------------------------------------------------------------------------- *)
+(* ------------------------------------------------------------------------- *)
+(* ------------------------------------------------------------------------- *)
+
+
+(*========Stability of Physical Human-robot Interaction (pHRI)========*)
+
+
+let is_stable_macro_mini_rob_sys = new_definition 
+    `is_stable_macro_mini_rob_sys (p:complex -> complex)  = 
+          ~ ({x | p x = Cx(&0) /\ Re x < (&0)} = EMPTY)`;; 
+
+
+let REAL_INV_NZ = prove
+ (`!x. ~(x = &0) ==> ~(inv x = &0)`,
+  GEN_TAC THEN DISCH_TAC THEN DISCH_THEN (MP_TAC o AP_TERM `(*) (x:real)`) THEN
+  ASM_SIMP_TAC [REAL_MUL_RZERO] THEN
+  SUBGOAL_THEN `(x * inv x)=(&1)` ASSUME_TAC THENL
+   [MATCH_MP_TAC REAL_MUL_RINV THEN ASM_SIMP_TAC [];
+    PURE_ASM_SIMP_TAC [] THEN CONV_TAC REAL_FIELD]);;
+
+
+let REAL_INV_POS = prove(
+  `!x. &0 < x ==> &0 < inv x`,
+  GEN_TAC THEN DISCH_TAC THEN REPEAT_TCL DISJ_CASES_THEN
+   MP_TAC (SPECL [`inv x:real`; `&0`] REAL_LT_TOTAL) THENL
+   [POP_ASSUM(ASSUME_TAC o MATCH_MP REAL_INV_NZ o
+              GSYM o MATCH_MP REAL_LT_IMP_NE) THEN ASM_REWRITE_TAC[];
+    ONCE_REWRITE_TAC[GSYM REAL_NEG_GT0] THEN
+    DISCH_THEN(MP_TAC o MATCH_MP REAL_LT_MUL o C CONJ (ASSUME `&0 < x`)) THEN
+    REWRITE_TAC[GSYM REAL_NEG_LMUL] THEN
+    POP_ASSUM(fun th -> REWRITE_TAC
+     [MATCH_MP REAL_MUL_LINV (GSYM (MATCH_MP REAL_LT_IMP_NE th))]) THEN
+    REWRITE_TAC[REAL_NEG_GT0] THEN DISCH_THEN(MP_TAC o CONJ REAL_LT_01) THEN
+    REWRITE_TAC[REAL_LT_ANTISYM];
+    REWRITE_TAC[]]);;
+
+let REAL_POS_POW2 = prove
+ (`!x. &0 <= x pow 2`,
+  STRIP_TAC THEN ONCE_REWRITE_TAC [GSYM REAL_POW2_ABS] THEN
+  SUBGOAL_THEN `&0 = &0 pow 2` ASSUME_TAC THENL
+   [REWRITE_TAC [REAL_POW_ZERO] THEN COND_CASES_TAC THENL
+     [UNDISCH_TAC `2 = 0` THEN ARITH_TAC; REWRITE_TAC []];
+    ONCE_ASM_REWRITE_TAC [] THEN MATCH_MP_TAC REAL_POW_LE2 THEN CONJ_TAC THEN
+    ARITH_TAC]);;
+
+let DENOM_LT_0 = prove
+ (`! (x:real)(y:real)(z:real).
+	((y < &0)) ==> ((x / y < z) = ( y * z < x))`,
+  REPEAT GEN_TAC THEN STRIP_TAC THEN REWRITE_TAC [] THEN
+  SUBGOAL_THEN `y = --abs y` ASSUME_TAC THENL
+   [SUBGOAL_THEN `~(&0 <= y)` ASSUME_TAC THENL
+     [REWRITE_TAC [REAL_NOT_LE] THEN ONCE_ASM_REWRITE_TAC [];
+      REWRITE_TAC [real_abs] THEN COND_CASES_TAC THENL
+       [ASM_MESON_TAC []; SIMPLE_COMPLEX_ARITH_TAC]];
+    ALL_TAC] THEN
+  SUBGOAL_THEN `~(abs y = &0)` ASSUME_TAC THENL
+   [MATCH_MP_TAC REAL_LT_IMP_NZ THEN UNDISCH_TAC `y = --abs y` THEN
+    SIMP_TAC [EQ_SYM] THEN SIMP_TAC [GSYM REAL_LNEG_UNIQ] THEN
+    ONCE_REWRITE_TAC [REAL_ADD_SYM] THEN SIMP_TAC [REAL_LNEG_UNIQ] THEN
+    SIMP_TAC [REAL_NEG_EQ] THEN SIMP_TAC [REAL_NEG_NEG] THEN POP_ASSUM MP_TAC;
+    SUBGOAL_THEN `&0 < abs y` ASSUME_TAC THENL
+     [UNDISCH_TAC `y = --abs y` THEN SIMP_TAC [EQ_SYM] THEN
+      SIMP_TAC [GSYM REAL_LNEG_UNIQ] THEN ONCE_REWRITE_TAC [REAL_ADD_SYM] THEN
+      SIMP_TAC [REAL_LNEG_UNIQ] THEN SIMP_TAC [REAL_NEG_EQ] THEN DISCH_TAC THEN
+      POP_ASSUM MP_TAC THEN POP_ASSUM MP_TAC THEN POP_ASSUM MP_TAC;
+      ONCE_ASM_REWRITE_TAC [] THEN ONCE_REWRITE_TAC [real_div] THEN
+      ONCE_REWRITE_TAC [REAL_INV_NEG] THEN
+      ONCE_REWRITE_TAC [GSYM REAL_NEG_LMUL] THEN
+      ONCE_REWRITE_TAC [REAL_NEG_RMUL] THEN ONCE_REWRITE_TAC [REAL_MUL_SYM] THEN
+      UNDISCH_TAC `&0 < abs y` THEN SIMP_TAC [GSYM REAL_LT_RDIV_EQ] THEN
+      DISCH_TAC THEN ONCE_REWRITE_TAC [real_div]]] THEN
+  CONV_TAC REAL_FIELD);;
+
+let  COMPLEX_EQ_RDIV_EQ = prove
+ (`!x y z. (~(z = Cx(&0)) ) ==> ( (x = y / z )<=> (x * z =  y) )`,
+  REPEAT GEN_TAC THEN DISCH_TAC THEN EQ_TAC THEN DISCH_TAC THENL
+   [ONCE_REWRITE_TAC
+      [SIMPLE_COMPLEX_ARITH `((x * z) = y) = ((x *z) = (y * Cx (&1)))`] THEN
+    SUBGOAL_THEN `Cx (&1) = z / z` ASSUME_TAC THENL
+     [REWRITE_TAC [complex_div] THEN ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN
+      MATCH_MP_TAC COMPLEX_MUL_RINV THEN ASM_REWRITE_TAC [];
+      UNDISCH_TAC `Cx (&1) = z / z` THEN SIMP_TAC [] THEN DISCH_TAC THEN
+      ONCE_ASM_REWRITE_TAC [] THEN REWRITE_TAC [complex_div] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC] THEN SIMPLE_COMPLEX_ARITH_TAC];
+    ONCE_REWRITE_TAC
+      [SIMPLE_COMPLEX_ARITH `( (x = y / z ) =  (x * Cx (&1) = y / z))`] THEN
+    SUBGOAL_THEN `Cx (&1) = z / z` ASSUME_TAC THENL
+     [REWRITE_TAC [complex_div] THEN ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN
+      MATCH_MP_TAC COMPLEX_MUL_RINV THEN ASM_REWRITE_TAC [];
+      UNDISCH_TAC `Cx (&1) = z / z` THEN SIMP_TAC [] THEN DISCH_TAC THEN
+      REWRITE_TAC [complex_div] THEN ONCE_REWRITE_TAC [COMPLEX_MUL_ASSOC] THEN
+      ONCE_ASM_REWRITE_TAC [] THEN SIMPLE_COMPLEX_ARITH_TAC]]);;
+
+let COMPLEX_EQ_LDIV_EQ = prove
+ (`!x y z. (~(z = Cx(&0)) ) ==> ( (x / z = y )<=> (x = z * y) )`,
+  REPEAT GEN_TAC THEN DISCH_TAC THEN EQ_TAC THEN DISCH_TAC THENL
+   [ONCE_REWRITE_TAC
+      [SIMPLE_COMPLEX_ARITH `((x = z * y) =((x * Cx(&1)) = z * y) )`] THEN
+    SUBGOAL_THEN `Cx (&1) = z / z` ASSUME_TAC THENL
+     [REWRITE_TAC [complex_div] THEN ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN
+      MATCH_MP_TAC COMPLEX_MUL_RINV THEN ASM_REWRITE_TAC [];
+      ALL_TAC] THEN
+    UNDISCH_TAC `Cx (&1) = z / z` THEN SIMP_TAC [] THEN DISCH_TAC THEN
+    ONCE_ASM_REWRITE_TAC [] THEN REWRITE_TAC [complex_div] THEN
+    ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC] THEN
+    SUBGOAL_THEN `x * (z:complex) * inv z = (x * inv z)* z` ASSUME_TAC THENL
+     [ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC];
+      ONCE_ASM_REWRITE_TAC [] THEN REWRITE_TAC [GSYM complex_div] THEN
+      ONCE_ASM_REWRITE_TAC []] THEN
+    SIMPLE_COMPLEX_ARITH_TAC;
+    REWRITE_TAC [complex_div] THEN ONCE_ASM_REWRITE_TAC [] THEN
+    ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC] THEN
+    SUBGOAL_THEN `(z * (y:complex) * inv z)=( (z * inv z )* y )` ASSUME_TAC THENL
+     [ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC] THEN SIMPLE_COMPLEX_ARITH_TAC;
+      ALL_TAC] THEN
+    ONCE_ASM_REWRITE_TAC [] THEN
+    SUBGOAL_THEN `(z * inv z = Cx (&1))` ASSUME_TAC THENL
+     [UNDISCH_TAC `~(z = Cx (&0))` THEN ONCE_REWRITE_TAC [COMPLEX_MUL_RINV];
+      ONCE_ASM_REWRITE_TAC [] THEN SIMPLE_COMPLEX_ARITH_TAC]]);;
+
+let COMPLEX_CSQRT_EQ_2 = prove
+ (`!(x:complex) y. (x = y) ==> (csqrt (x) = csqrt (y))`,
+  ASM_MESON_TAC []);;
+
+let COMPLEX_EQ_CSQR_EQ = prove
+ (`!(x:complex) y. (x = y) ==> ( ((x)pow 2) = ((y) pow 2) )`,
+  ASM_MESON_TAC []);;
+
+let CX_IM_0_PROD = prove
+ (`!(x:complex) y.((Im y = &0) /\ (Im x = &0))
+   		 ==> (Re (x * y) = Re (x)* Re (y))`,
+  REPEAT STRIP_TAC THEN REWRITE_TAC [complex_mul] THEN REWRITE_TAC [RE] THEN
+  UNDISCH_TAC `Im x = &0` THEN SIMP_TAC [] THEN DISCH_TAC THEN
+  SIMPLE_COMPLEX_ARITH_TAC);;
+
+let REAL_POW_3 = prove
+ (`!(x:real). ( (x * x * x )=((x) pow 3 ) )`,
+  GEN_TAC THEN SUBGOAL_THEN `3 = 2 + 1` ASSUME_TAC 
+  THENL [ARITH_TAC; ALL_TAC] THEN
+  UNDISCH_TAC `3 = 2 + 1` THEN SIMP_TAC [] THEN DISCH_TAC THEN
+  ONCE_REWRITE_TAC [REAL_POW_ADD] THEN ONCE_REWRITE_TAC [REAL_POW_2] THEN
+  ONCE_REWRITE_TAC [REAL_POW_1] THEN REAL_ARITH_TAC);;
+
+let COMPLEX_POW_3 = prove
+ (`!(x:complex). ( (x * x * x )=((x) pow 3 ) )`,
+  GEN_TAC THEN SUBGOAL_THEN `3 = 2 + 1` ASSUME_TAC THENL [ARITH_TAC; ALL_TAC] THEN
+  ONCE_REWRITE_TAC [COMPLEX_FIELD `3 = 2 + 1`] THEN UNDISCH_TAC `3 = 2 + 1` THEN
+  SIMP_TAC [] THEN DISCH_TAC THEN ONCE_REWRITE_TAC [COMPLEX_POW_ADD] THEN
+  ONCE_REWRITE_TAC [COMPLEX_POW_2] THEN ONCE_REWRITE_TAC [COMPLEX_POW_1] THEN
+  SIMPLE_COMPLEX_ARITH_TAC);;
+
+(*======================================================================*)
+(*                          Quadratic Formula                           *)
+(*======================================================================*)
+
+let QUADRATIC_FORMULA = prove
+ (`!a b c s. ~(Cx (&0) = Cx a) ==> 
+( ((Cx a * (s pow 2 )) + (Cx b * (s)) + Cx c = Cx (&0))
+ <=>  ( (s = ( ( Cx (--b) + csqrt (((Cx b) pow 2) - (Cx (&4)) * Cx a * Cx c)) / (Cx (&2) * (Cx a)) ) ) \/
+      (s = ( ( Cx (--b) - csqrt ( ((Cx b) pow 2) - Cx (&4) * Cx a * Cx c)) / (Cx (&2) * Cx a) ) ) ) )`,
+  REPEAT GEN_TAC THEN STRIP_TAC THEN EQ_TAC THENL
+   [DISCH_TAC THEN
+    SUBGOAL_THEN
+      `(s + Cx b * inv (Cx (&2) * Cx a)) pow 2 =
+      (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&4) * Cx a pow 2)`
+      ASSUME_TAC THENL
+     [ONCE_REWRITE_TAC [COMPLEX_POW_2] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_LDISTRIB] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_RDISTRIB] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_POW_2] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_ADD_ASSOC] THEN
+      ONCE_REWRITE_TAC [COMPLEX_POW_MUL] THEN
+      ONCE_REWRITE_TAC [COMPLEX_INV_MUL] THEN
+      ONCE_REWRITE_TAC [COMPLEX_POW_MUL] THEN
+      ONCE_REWRITE_TAC [COMPLEX_POW_INV] THEN
+      ONCE_REWRITE_TAC [COMPLEX_POW_2] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_POW_2] THEN
+      SUBGOAL_THEN `inv (Cx (&2) pow 2) = inv (Cx (&4))` ASSUME_TAC THENL
+       [ONCE_REWRITE_TAC [COMPLEX_POW_2] THEN SIMPLE_COMPLEX_ARITH_TAC;
+        ALL_TAC] THEN
+      UNDISCH_TAC `inv (Cx (&2) pow 2) = inv (Cx (&4))` THEN SIMP_TAC [] THEN
+      DISCH_TAC THEN POP_ASSUM (K ALL_TAC) THEN
+      ONCE_REWRITE_TAC [COMPLEX_SUB_RDISTRIB] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_ASSOC] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_EQ_SUB_LADD] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_RINV] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `((a:complex) - b - (c + d) = a - b - c - d)`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `( (a:complex) - b - c - a = --b + --c  )`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `( ((a:complex)*b*c)*d*e = (a*d)*(b*e)*c  )`] THEN
+      ONCE_REWRITE_TAC [COMPLEX_POW_2] THEN
+      ONCE_REWRITE_TAC [COMPLEX_INV_MUL] THEN
+      SUBGOAL_THEN `~(Cx (&4) = Cx (&0))` ASSUME_TAC THENL
+       [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+      UNDISCH_TAC `~(Cx (&4) = Cx (&0))` THEN SIMP_TAC [COMPLEX_MUL_RINV] THEN
+      DISCH_TAC THEN POP_ASSUM (K ALL_TAC) THEN
+      ONCE_REWRITE_TAC [SIMPLE_COMPLEX_ARITH `(Cx(&1) * (a:complex) ) = (a)`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `( ((a:complex)*b*c)*d = a * d * (b * c)  )`] THEN
+      UNDISCH_TAC `~(Cx (&0) = Cx a)` THEN SIMP_TAC [EQ_SYM_EQ] THEN
+      SIMP_TAC [COMPLEX_MUL_RINV] THEN DISCH_TAC THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `( (a:complex) * b * c * d = b * d * (a * c))`] THEN
+      UNDISCH_TAC `~(Cx a = Cx (&0))` THEN SIMP_TAC [EQ_SYM_EQ] THEN
+      SIMP_TAC [COMPLEX_MUL_RINV] THEN DISCH_TAC THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `((a:complex) * b * (Cx (&1)) = a * b)`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(((a:complex) + b  = --c + --d)=
+    		      			    		  (a + b + c + d = Cx (&0)))`] THEN
+      SUBGOAL_THEN
+        `Cx b * inv (Cx a) * s * inv (Cx (&2)) =
+      s * inv (Cx a) * Cx b * inv (Cx (&2))`
+        ASSUME_TAC THENL
+       [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+      UNDISCH_TAC
+        `Cx b * inv (Cx a) * s * inv (Cx (&2)) =
+      s * inv (Cx a) * Cx b * inv (Cx (&2))` THEN
+      SIMP_TAC [] THEN DISCH_TAC THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `(((a:complex) + b + c + d = a + c + (b + d)))`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `(( a + c + b + b) = a + c + Cx (&2)*b )`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `( (a:complex)*b*c*d = b * (c * d)* a)`] THEN
+      SUBGOAL_THEN `~( Cx (&2) = Cx (&0) )` ASSUME_TAC THENL
+       [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `( (a:complex)*(b*c*d)*e = a * b * c * (e * d ) )`] THEN
+      UNDISCH_TAC `~( Cx (&2) = Cx (&0) )` THEN SIMP_TAC [COMPLEX_MUL_RINV] THEN
+      DISCH_TAC THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(((a:complex) + b + c ) =(a + b + c) * (Cx (&1)) )`] THEN
+      SUBGOAL_THEN `Cx a * inv (Cx a) = Cx (&1)` ASSUME_TAC THENL
+       [UNDISCH_TAC `~(Cx a = Cx (&0))` THEN SIMP_TAC [COMPLEX_MUL_RINV];
+        ALL_TAC] THEN
+      UNDISCH_TAC `Cx a * inv (Cx a) = Cx (&1)` THEN SIMP_TAC [EQ_SYM_EQ] THEN
+      DISCH_TAC THEN ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(((a:complex) + b) * c * d) = (((a + b) * c) * d )`] THEN
+      ONCE_REWRITE_TAC [GSYM complex_div] THEN
+      UNDISCH_TAC `~(Cx a = Cx (&0))` THEN SIMP_TAC [COMPLEX_EQ_LDIV_EQ] THEN
+      SIMP_TAC [COMPLEX_MUL_RINV] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `((a:complex) * b * (Cx (&1)) = a * b)`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `((a:complex) * (Cx (&0)) = (Cx (&0)))`] THEN
+      DISCH_TAC THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(((a:complex) + b + c) * d) = (a * d + b * d + c * d )`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(((a:complex) + b + c) * d) = (a * d + b * d + c * d )`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `(((a:complex) * b * c)*d) = (a*(d*b)*c)`] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_POW_2] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `(((a:complex) * b) * c) = ((c*b)*a)`] THEN
+      UNDISCH_TAC `~(Cx a = Cx (&0))` THEN SIMP_TAC [COMPLEX_MUL_RINV] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `(((a:complex) *b)*c) = ((b*c)*a)`] THEN
+      SIMP_TAC [COMPLEX_MUL_LINV] THEN
+      ONCE_REWRITE_TAC [SIMPLE_COMPLEX_ARITH `(Cx(&1) * (a:complex) ) = (a)`] THEN
+      DISCH_TAC THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `((a:complex)*b + c + d*e ) = (b*a + e*d+c)`] THEN
+      UNDISCH_TAC `Cx a * s pow 2 + Cx b * s + Cx c = Cx (&0)` THEN
+      SIMP_TAC [];
+      UNDISCH_TAC
+        `(s + Cx b * inv (Cx (&2) * Cx a)) pow 2 =
+      (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&4) * Cx a pow 2)` THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_SUB_0] THEN
+      SUBGOAL_THEN
+        `((Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&4) * Cx a pow 2) )
+   		 = ((csqrt ((Cx b pow 2 - Cx (&4) * Cx a * Cx c))) * inv (Cx (&2) * Cx a)) pow 2`
+        ASSUME_TAC THENL
+       [ONCE_REWRITE_TAC [COMPLEX_POW_MUL] THEN ONCE_REWRITE_TAC [CSQRT] THEN
+        ONCE_REWRITE_TAC [COMPLEX_POW_INV] THEN
+        ONCE_REWRITE_TAC [COMPLEX_POW_MUL] THEN
+        ONCE_REWRITE_TAC [COMPLEX_POW_2] THEN
+        ONCE_REWRITE_TAC
+          [SIMPLE_COMPLEX_ARITH
+             `((Cx (&2) * Cx (&2))) = 
+     		       	(Cx (&4))`] THEN
+        SIMPLE_COMPLEX_ARITH_TAC;
+        ALL_TAC] THEN
+      ONCE_ASM_REWRITE_TAC [] THEN ONCE_REWRITE_TAC [COMPLEX_POW_2] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_DIFFSQ] THEN
+      ONCE_REWRITE_TAC [COMPLEX_MUL_SYM] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ENTIRE] THEN ONCE_REWRITE_TAC [complex_div] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_RDISTRIB] THEN ONCE_REWRITE_TAC [CX_NEG] THEN
+      DISCH_TAC THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `((a:complex) - (--c*b + d )) = (a + c*b - d)`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(a - ( --c - d) * e) =
+    		      			 ((a:complex) + c*e + d*e )`] THEN
+      UNDISCH_TAC
+        `(s + Cx b * inv (Cx (&2) * Cx a)) -
+      csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a) =
+      Cx (&0) \/
+      (s + Cx b * inv (Cx (&2) * Cx a)) +
+      csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a) =
+      Cx (&0)` THEN
+      SIMP_TAC [] THEN ONCE_ASM_REWRITE_TAC [GSYM COMPLEX_ADD_ASSOC] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `((a + b) + c) = ((a:complex) + b + c)`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `((a + b) - c) = ((a:complex) + b - c)`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH `((a *  b) * c) = c * ((a:complex) *  b )`] THEN
+      DISCH_TAC THEN ONCE_REWRITE_TAC [GSYM COMPLEX_POW_2] THEN
+      SUBGOAL_THEN `Cx a * Cx (&2) = Cx (&2) * Cx a` ASSUME_TAC THENL
+       [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+      UNDISCH_TAC `Cx a * Cx (&2) = Cx (&2) * Cx a` THEN SIMP_TAC [] THEN
+      DISCH_TAC THEN POP_ASSUM (K ALL_TAC) THEN ONCE_ASM_REWRITE_TAC []];
+    ONCE_REWRITE_TAC [COMPLEX_ADD_ASSOC] THEN
+    ONCE_REWRITE_TAC [COMPLEX_LNEG_UNIQ] THEN
+    SUBGOAL_THEN `Cx (&1) = inv (Cx a) * inv (inv (Cx a))` ASSUME_TAC THENL
+     [ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN ONCE_REWRITE_TAC [COMPLEX_INV_INV] THEN
+      MATCH_MP_TAC COMPLEX_MUL_LINV THEN ONCE_ASM_REWRITE_TAC [] THEN
+      SIMPLE_COMPLEX_ARITH_TAC;
+      ALL_TAC] THEN
+    ONCE_REWRITE_TAC
+      [SIMPLE_COMPLEX_ARITH
+         `(Cx a * s pow 2 + Cx b * s = --Cx c) =
+    		      			    (Cx a * s pow 2 + Cx b * s) * (Cx (&1)) = --Cx c`] THEN
+    UNDISCH_TAC `Cx (&1) = inv (Cx a) * inv (inv (Cx a))` THEN SIMP_TAC [] THEN
+    DISCH_TAC THEN POP_ASSUM (K ALL_TAC) THEN
+    SUBGOAL_THEN
+      `(Cx a * s pow 2 + Cx b * s) * inv (Cx a) * inv (inv (Cx a)) =
+      ((Cx a * s pow 2 + Cx b * s) * inv (Cx a)) / inv (Cx a)`
+      ASSUME_TAC THENL
+     [ONCE_REWRITE_TAC [complex_div] THEN SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+    UNDISCH_TAC
+      `(Cx a * s pow 2 + Cx b * s) * inv (Cx a) * inv (inv (Cx a)) =
+      ((Cx a * s pow 2 + Cx b * s) * inv (Cx a)) / inv (Cx a)` THEN
+    SIMP_TAC [] THEN DISCH_TAC THEN POP_ASSUM (K ALL_TAC) THEN
+    SUBGOAL_THEN `~(inv (Cx a) = Cx (&0))` ASSUME_TAC THENL
+     [SUBGOAL_THEN `(((inv (Cx (a))) = Cx (&0)) = (Cx (a) = Cx(&0)) )`
+        ASSUME_TAC THENL
+       [ONCE_REWRITE_TAC [COMPLEX_INV_EQ_0];
+        ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC) THEN
+        ONCE_ASM_REWRITE_TAC []] THEN
+      ONCE_ASM_REWRITE_TAC [];
+      ALL_TAC] THEN
+    UNDISCH_TAC `~(inv (Cx a) = Cx (&0))` THEN SIMP_TAC [COMPLEX_EQ_LDIV_EQ] THEN
+    DISCH_TAC THEN ONCE_REWRITE_TAC [COMPLEX_ADD_RDISTRIB] THEN
+    ONCE_REWRITE_TAC
+      [SIMPLE_COMPLEX_ARITH
+         `( (Cx a * s pow 2) * inv (Cx a) + (Cx b * s) * inv (Cx a) =
+  inv (Cx a) * --Cx c ) = ( ((Cx a * s pow 2) * inv (Cx a) + (Cx b * s) * inv (Cx a)) + Cx (&0) =
+  inv (Cx a) * --Cx c)`] THEN
+    SUBGOAL_THEN
+      `Cx (&0) =
+      Cx b pow 2 * inv (Cx (&4) * Cx a pow 2) -
+      Cx b pow 2 * inv (Cx (&4) * Cx a pow 2)`
+      ASSUME_TAC THENL
+     [ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+    UNDISCH_TAC
+      `Cx (&0) =
+      Cx b pow 2 * inv (Cx (&4) * Cx a pow 2) -
+      Cx b pow 2 * inv (Cx (&4) * Cx a pow 2)` THEN
+    SIMP_TAC [] THEN DISCH_TAC THEN POP_ASSUM (K ALL_TAC) THEN
+    ONCE_REWRITE_TAC
+      [SIMPLE_COMPLEX_ARITH
+         `((((a:complex) + b) + c - d) = (a + b + c - d ))`] THEN
+    ONCE_REWRITE_TAC
+      [SIMPLE_COMPLEX_ARITH
+         `(((a:complex) + b + c - d) = ((a + b + c) - d ))`] THEN
+    ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN ONCE_REWRITE_TAC [COMPLEX_EQ_SUB_LADD] THEN
+    ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN
+    SUBGOAL_THEN `(Cx a * s pow 2) * inv (Cx a) = s pow 2` ASSUME_TAC THENL
+     [ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `((Cx a * s pow 2) * inv (Cx a) = s pow 2) = 
+     		       	((Cx a * s pow 2) * inv (Cx a) = Cx (&1) * s pow 2)`] THEN
+      SUBGOAL_THEN `Cx (&1) = inv (Cx a) * Cx a` ASSUME_TAC THENL
+       [UNDISCH_TAC `~(Cx (&0) = Cx a)` THEN ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN
+        ONCE_REWRITE_TAC [COMPLEX_MUL_LINV];
+        UNDISCH_TAC `Cx (&1) = inv (Cx a) * Cx a` THEN SIMP_TAC [] THEN
+        DISCH_TAC THEN SIMPLE_COMPLEX_ARITH_TAC];
+      ALL_TAC] THEN
+    UNDISCH_TAC `(Cx a * s pow 2) * inv (Cx a) = s pow 2` THEN SIMP_TAC [] THEN
+    DISCH_TAC THEN POP_ASSUM (K ALL_TAC) THEN
+    SUBGOAL_THEN
+      `s pow 2 +
+      (Cx b * s) * inv (Cx a) +
+      Cx b pow 2 * inv (Cx (&4) * Cx a pow 2) =
+      (s + Cx b * inv (Cx (&2) * Cx a)) pow 2`
+      ASSUME_TAC THENL
+     [ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN REWRITE_TAC [COMPLEX_POW_2] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_LDISTRIB] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_RDISTRIB] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_POW_2] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_ADD_ASSOC] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_LDISTRIB] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_RDISTRIB] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `((((a:complex)*b)*d) = 
+     		       	(d*a*b))`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(((a:complex) + b + b + c) = 
+     		       	(a + Cx(&2)*b + c))`] THEN
+      ONCE_REWRITE_TAC [COMPLEX_INV_MUL] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(((a:complex)*b*c*d*e) = 
+     		       	((a*d)*e*c*b))`] THEN
+      SUBGOAL_THEN `~( Cx (&2) = Cx (&0) )` ASSUME_TAC THENL
+       [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+      UNDISCH_TAC `~( Cx (&2) = Cx (&0) )` THEN DISCH_TAC THEN
+      SUBGOAL_THEN `Cx (&2) * inv (Cx (&2)) = Cx (&1)` ASSUME_TAC THENL
+       [UNDISCH_TAC `~( Cx (&2) = Cx (&0) )` THEN
+        ONCE_REWRITE_TAC [COMPLEX_MUL_RINV];
+        ALL_TAC] THEN
+      UNDISCH_TAC `Cx (&2) * inv (Cx (&2)) = Cx (&1)` THEN SIMP_TAC [] THEN
+      DISCH_TAC THEN ONCE_REWRITE_TAC [COMPLEX_POW_MUL] THEN
+      ONCE_REWRITE_TAC [COMPLEX_POW_MUL] THEN
+      ONCE_REWRITE_TAC [COMPLEX_POW_INV] THEN
+      ONCE_REWRITE_TAC [COMPLEX_POW_2] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `((Cx (&2) * Cx (&2))) = 
+     		       	(Cx (&4))`] THEN
+      ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `((Cx (&1) * a * b * c)) = 
+     		       	(a*b*c)`] THEN
+      SIMPLE_COMPLEX_ARITH_TAC;
+      ALL_TAC] THEN
+    UNDISCH_TAC
+      `s pow 2 +
+      (Cx b * s) * inv (Cx a) +
+      Cx b pow 2 * inv (Cx (&4) * Cx a pow 2) =
+      (s + Cx b * inv (Cx (&2) * Cx a)) pow 2` THEN
+    SIMP_TAC [] THEN DISCH_TAC THEN ONCE_REWRITE_TAC [COMPLEX_MUL_RNEG] THEN
+    ONCE_REWRITE_TAC
+      [SIMPLE_COMPLEX_ARITH `(--a + b) = 
+     		       	(b + --a)`] THEN
+    ONCE_REWRITE_TAC [GSYM complex_sub] THEN REPEAT STRIP_TAC THENL
+     [UNDISCH_TAC
+        `s =
+      (Cx (--b) + csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+      (Cx (&2) * Cx a)` THEN
+      SIMP_TAC [CX_NEG] THEN DISCH_TAC THEN ONCE_REWRITE_TAC [complex_div] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_RDISTRIB] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_ADD_ASSOC] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_SYM] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_ADD_ASSOC] THEN
+      SUBGOAL_THEN
+        `csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a) +
+      Cx b * inv (Cx (&2) * Cx a) +
+      --Cx b * inv (Cx (&2) * Cx a) =
+      csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a) +
+      Cx b * inv (Cx (&2) * Cx a) - Cx b * inv (Cx (&2) * Cx a)`
+        ASSUME_TAC THENL
+       [ONCE_REWRITE_TAC [complex_sub] THEN SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+      UNDISCH_TAC
+        `csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a) +
+      Cx b * inv (Cx (&2) * Cx a) +
+      --Cx b * inv (Cx (&2) * Cx a) =
+      csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a) +
+      Cx b * inv (Cx (&2) * Cx a) - Cx b * inv (Cx (&2) * Cx a)` THEN
+      SIMP_TAC [] THEN DISCH_TAC THEN
+      SUBGOAL_THEN
+        `(csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a) +
+  Cx b * inv (Cx (&2) * Cx a) - Cx b * inv (Cx (&2) * Cx a)) = (csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a) +
+ ( Cx b * inv (Cx (&2) * Cx a) - Cx b * inv (Cx (&2) * Cx a) ))`
+        ASSUME_TAC THENL
+       [ONCE_REWRITE_TAC [complex_sub]; ALL_TAC] THEN
+      ONCE_REWRITE_TAC [COMPLEX_SUB_REFL] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_RID] THEN
+      ONCE_REWRITE_TAC [COMPLEX_POW_MUL] THEN ONCE_REWRITE_TAC [CSQRT] THEN
+      ONCE_REWRITE_TAC [COMPLEX_POW_INV] THEN
+      ONCE_REWRITE_TAC [COMPLEX_POW_MUL] THEN
+      ONCE_REWRITE_TAC [COMPLEX_INV_MUL] THEN
+      ONCE_REWRITE_TAC [COMPLEX_SUB_RDISTRIB] THEN
+      SUBGOAL_THEN
+        `((Cx (&4) * Cx a * Cx c) * inv (Cx (&2) pow 2) * inv (Cx a pow 2) =
+      (Cx (&4) * inv (Cx (&2) pow 2)) * (Cx a * inv (Cx a pow 2)) * Cx c)`
+        ASSUME_TAC THENL
+       [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+      UNDISCH_TAC
+        `((Cx (&4) * Cx a * Cx c) * inv (Cx (&2) pow 2) * inv (Cx a pow 2) =
+      (Cx (&4) * inv (Cx (&2) pow 2)) * (Cx a * inv (Cx a pow 2)) * Cx c)` THEN
+      SIMP_TAC [] THEN DISCH_TAC THEN ONCE_REWRITE_TAC [COMPLEX_POW_2] THEN
+      ONCE_REWRITE_TAC [COMPLEX_INV_MUL] THEN
+      SUBGOAL_THEN `(inv (Cx (&2)) * inv (Cx (&2)) = inv (Cx (&4)))`
+        ASSUME_TAC THENL
+       [ONCE_REWRITE_TAC [GSYM COMPLEX_INV_MUL] THEN SIMPLE_COMPLEX_ARITH_TAC;
+        ALL_TAC] THEN
+      UNDISCH_TAC `(inv (Cx (&2)) * inv (Cx (&2)) = inv (Cx (&4)))` THEN
+      SIMP_TAC [] THEN DISCH_TAC THEN
+      SUBGOAL_THEN `~(Cx (&4) = Cx (&0))` ASSUME_TAC THENL
+       [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+      SUBGOAL_THEN `Cx (&4) * inv (Cx (&4)) = Cx (&1)` ASSUME_TAC THENL
+       [UNDISCH_TAC `~(Cx (&4) = Cx (&0))` THEN
+        ONCE_REWRITE_TAC [COMPLEX_MUL_RINV];
+        ALL_TAC] THEN
+      UNDISCH_TAC `Cx (&4) * inv (Cx (&4)) = Cx (&1)` THEN SIMP_TAC [] THEN
+      DISCH_TAC THEN POP_ASSUM (K ALL_TAC) THEN POP_ASSUM (K ALL_TAC) THEN
+      POP_ASSUM (K ALL_TAC) THEN POP_ASSUM (K ALL_TAC) THEN
+      POP_ASSUM (K ALL_TAC) THEN POP_ASSUM (K ALL_TAC) THEN
+      SUBGOAL_THEN
+        `Cx a * inv (Cx a) * inv (Cx a) = (Cx a * inv (Cx a)) * inv (Cx a)`
+        ASSUME_TAC THENL
+       [ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC] THEN
+        SIMPLE_COMPLEX_ARITH_TAC;
+        ALL_TAC] THEN
+      UNDISCH_TAC
+        `Cx a * inv (Cx a) * inv (Cx a) = (Cx a * inv (Cx a)) * inv (Cx a)` THEN
+      SIMP_TAC [] THEN DISCH_TAC THEN
+      SUBGOAL_THEN `Cx a * inv (Cx a) = Cx (&1)` ASSUME_TAC THENL
+       [UNDISCH_TAC `~(Cx (&0) = Cx a)` THEN SIMP_TAC [EQ_SYM_EQ] THEN
+        DISCH_TAC THEN ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN
+        UNDISCH_TAC `~(Cx a = Cx (&0))` THEN
+        ONCE_REWRITE_TAC [COMPLEX_MUL_RINV];
+        UNDISCH_TAC `Cx a * inv (Cx a) = Cx (&1)` THEN SIMP_TAC [] THEN
+        DISCH_TAC THEN SIMPLE_COMPLEX_ARITH_TAC];
+      UNDISCH_TAC
+        `s =
+      (Cx (--b) - csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+      (Cx (&2) * Cx a)` THEN
+      SIMP_TAC [CX_NEG] THEN DISCH_TAC THEN ONCE_REWRITE_TAC [complex_div] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_RDISTRIB] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_ADD_ASSOC] THEN
+      ONCE_REWRITE_TAC [COMPLEX_ADD_SYM] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_ADD_ASSOC] THEN
+      ONCE_REWRITE_TAC [COMPLEX_SUB_RDISTRIB] THEN
+      SUBGOAL_THEN
+        `Cx b * inv (Cx (&2) * Cx a) +
+      --Cx b * inv (Cx (&2) * Cx a) -
+      csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a) =
+      Cx (&0) -
+      csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a)`
+        ASSUME_TAC THENL
+       [ALL_TAC;
+        UNDISCH_TAC
+          `Cx b * inv (Cx (&2) * Cx a) +
+      --Cx b * inv (Cx (&2) * Cx a) -
+      csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a) =
+      Cx (&0) -
+      csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c) * inv (Cx (&2) * Cx a)` THEN
+        SIMP_TAC [] THEN DISCH_TAC THEN ONCE_REWRITE_TAC [COMPLEX_POW_2] THEN
+        ONCE_REWRITE_TAC [complex_sub] THEN
+        ONCE_REWRITE_TAC [COMPLEX_ADD_LDISTRIB] THEN
+        ONCE_REWRITE_TAC
+          [SIMPLE_COMPLEX_ARITH `(Cx(&0) + --a) = 
+     		       	(--a)`] THEN
+        ONCE_REWRITE_TAC
+          [SIMPLE_COMPLEX_ARITH `(--a * Cx(&0)) = 
+     		       	(Cx(&0))`] THEN
+        ONCE_REWRITE_TAC [COMPLEX_NEG_MUL2] THEN
+        ONCE_REWRITE_TAC [GSYM COMPLEX_POW_2] THEN
+        ONCE_REWRITE_TAC [COMPLEX_POW_MUL] THEN ONCE_REWRITE_TAC [CSQRT] THEN
+        ONCE_REWRITE_TAC [COMPLEX_SUB_RDISTRIB] THEN
+        ONCE_REWRITE_TAC [COMPLEX_POW_INV] THEN
+        ONCE_REWRITE_TAC [COMPLEX_POW_MUL] THEN
+        ONCE_REWRITE_TAC [COMPLEX_POW_2] THEN
+        ONCE_REWRITE_TAC
+          [SIMPLE_COMPLEX_ARITH
+             `((Cx (&2) * Cx (&2))) = 
+     		       	(Cx (&4))`] THEN
+        ONCE_REWRITE_TAC [COMPLEX_INV_MUL] THEN
+        ONCE_REWRITE_TAC [COMPLEX_INV_MUL] THEN
+        ONCE_REWRITE_TAC
+          [SIMPLE_COMPLEX_ARITH
+             `(((a:complex)*b*c)*d*e*f) = 
+     		       	((a*d)*(b*e)*(f*c))`] THEN
+        SUBGOAL_THEN `~(Cx (&4) = Cx (&0))` ASSUME_TAC THENL
+         [ALL_TAC;
+          UNDISCH_TAC `~(Cx (&4) = Cx (&0))` THEN SIMP_TAC [COMPLEX_MUL_RINV] THEN
+          DISCH_TAC THEN UNDISCH_TAC `~(Cx (&0) = Cx a)` THEN
+          SIMP_TAC [EQ_SYM_EQ] THEN SIMP_TAC [COMPLEX_MUL_RINV] THEN
+          ONCE_REWRITE_TAC [GSYM COMPLEX_POW_2] THEN
+          ONCE_REWRITE_TAC
+            [SIMPLE_COMPLEX_ARITH
+               `(Cx (&0) + ((a:complex)*b*c)-
+     Cx (&1) * Cx (&1) * d *e  ) = 
+     		       	(((a:complex)*b*c)-d *e )`] THEN
+          DISCH_TAC THEN ONCE_REWRITE_TAC [GSYM complex_sub]]] THEN
+      SIMPLE_COMPLEX_ARITH_TAC]]);;
+
+(*======================================================================*)
+(*                        Real Roots (Case 1)                           *)
+(*                      x = -b + sqrt (x)/ 2 a                          *)
+(*             0 < a  /\ sqrt (b pow 2 - &4 * a * c) < b                *)
+(*======================================================================*)
+
+let QUAD_REAL_CASE1 = prove
+ (`!(a:real) (b:real) (c:real). 
+  ~(Cx(&0) = Cx(a)) /\
+  (&0 < (b pow 2 - &4 * a * c)) /\ 
+  (sqrt (b pow 2 - &4 * a * c) < b) /\ 
+  (&0 < a)  ==> 
+  (is_stable_macro_mini_rob_sys (\x:complex. Cx a * x pow 2 + Cx b * x + Cx c) )`,
+  REPEAT GEN_TAC THEN REPEAT STRIP_TAC THEN 
+  ONCE_REWRITE_TAC [is_stable_macro_mini_rob_sys] THEN
+  SIMP_TAC [EXTENSION] THEN REWRITE_TAC [IN_ELIM_THM] THEN
+  SUBGOAL_THEN
+    `!x:complex. ((Cx a * x pow 2 + Cx b * x + Cx c = Cx (&0)) = (x =
+              (Cx (--b) + csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) \/
+              x =
+              (Cx (--b) - csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) ) )`
+    ASSUME_TAC THENL
+   [REPEAT GEN_TAC THEN MATCH_MP_TAC QUADRATIC_FORMULA THEN
+    ONCE_ASM_REWRITE_TAC [] THEN MESON_TAC [];
+    ALL_TAC] THEN
+  ONCE_ASM_REWRITE_TAC [] THEN ONCE_ASM_REWRITE_TAC [NOT_FORALL_THM] THEN
+  EXISTS_TAC
+    `(Cx (--b) + csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+          (Cx (&2) * Cx a)` THEN
+  ASM_REWRITE_TAC [] THEN REWRITE_TAC [complex_div] THEN
+  REWRITE_TAC [COMPLEX_ADD_RDISTRIB] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_INV] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_MUL] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  ONCE_REWRITE_TAC [GSYM CX_POW] THEN REWRITE_TAC [GSYM CX_SUB] THEN
+  SUBGOAL_THEN
+    `csqrt (Cx (b pow 2 - &4 * a * c)) = Cx (sqrt (b pow 2 - &4 * a * c))`
+    ASSUME_TAC THENL
+   [REWRITE_TAC [EQ_SYM_EQ] THEN MATCH_MP_TAC CX_SQRT THEN
+    REWRITE_TAC [REAL_LE_LT] THEN UNDISCH_TAC `&0 < b pow 2 - &4 * a * c` THEN
+    SIMP_TAC [];
+    ALL_TAC] THEN
+  UNDISCH_TAC
+    `csqrt (Cx (b pow 2 - &4 * a * c)) = Cx (sqrt (b pow 2 - &4 * a * c))` THEN
+  SIMP_TAC [] THEN DISCH_TAC THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_ADD] THEN REWRITE_TAC [RE_CX] THEN
+  ONCE_REWRITE_TAC [REAL_RING `--a * c + (b:real) * c = (--a + b) * c`] THEN
+  SUBGOAL_THEN `~( Cx (&0) = (Cx (&2) * Cx a))` ASSUME_TAC THENL
+   [SUBGOAL_THEN `Cx (&0) = Cx (&2) * Cx a <=> Cx (&0) = Cx a` ASSUME_TAC THENL
+     [ALL_TAC;
+      UNDISCH_TAC `Cx (&0) = Cx (&2) * Cx a <=> Cx (&0) = Cx a` THEN
+      SIMP_TAC [] THEN DISCH_TAC THEN POP_ASSUM (K ALL_TAC) THEN
+      ONCE_ASM_REWRITE_TAC [] THEN ONCE_ASM_REWRITE_TAC []] THEN
+    EQ_TAC THEN DISCH_TAC THENL
+     [ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(Cx (&0) = Cx a )=(Cx (&0) = (Cx (&2) /Cx (&2))  * Cx a)`] THEN
+      REWRITE_TAC [complex_div] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC] THEN
+      SUBGOAL_THEN
+        `Cx (&2) * inv (Cx (&2)) * Cx a = (Cx (&2) * Cx a) * inv (Cx (&2))`
+        ASSUME_TAC THENL
+       [ALL_TAC;
+        UNDISCH_TAC
+          `Cx (&2) * inv (Cx (&2)) * Cx a = (Cx (&2) * Cx a) * inv (Cx (&2))` THEN
+        SIMP_TAC [] THEN DISCH_TAC THEN REWRITE_TAC [GSYM complex_div] THEN
+        SUBGOAL_THEN `~(Cx (&2) = Cx (&0))` ASSUME_TAC THENL
+         [ALL_TAC;
+          UNDISCH_TAC `~(Cx (&2) = Cx (&0))` THEN
+          SIMP_TAC [COMPLEX_EQ_RDIV_EQ] THEN DISCH_TAC THEN
+          SIMP_TAC [COMPLEX_EQ_RDIV_EQ] THEN
+          SUBGOAL_THEN `Cx (&0) * Cx (&2) = Cx (&0)` ASSUME_TAC THENL
+           [ALL_TAC;
+            UNDISCH_TAC `Cx (&0) * Cx (&2) = Cx (&0)` THEN SIMP_TAC [] THEN
+            DISCH_TAC THEN ONCE_ASM_REWRITE_TAC []]]];
+      SUBGOAL_THEN `~(Cx (&2) = Cx (&0))` ASSUME_TAC THENL
+       [ALL_TAC;
+        UNDISCH_TAC `~(Cx (&2) = Cx (&0))` THEN
+        SIMP_TAC [GSYM COMPLEX_EQ_LDIV_EQ] THEN DISCH_TAC THEN
+        REWRITE_TAC [complex_div] THEN UNDISCH_TAC `(Cx (&0) = Cx a)` THEN
+        SIMP_TAC [GSYM COMPLEX_EQ_LDIV_EQ]]] THEN
+    SIMPLE_COMPLEX_ARITH_TAC;
+    SIMP_TAC [GSYM CX_MUL] THEN SIMP_TAC [CX_INJ] THEN
+    SUBGOAL_THEN `&0 < &2*a` ASSUME_TAC THENL
+     [MATCH_MP_TAC REAL_LT_MUL THEN ASM_REWRITE_TAC [] THEN REAL_ARITH_TAC;
+      ALL_TAC] THEN
+    ONCE_REWRITE_TAC [SIMPLE_COMPLEX_ARITH `((&0)) = ((&0) * inv (&2 * a))`] THEN
+    SUBGOAL_THEN
+      `(--b + sqrt (b pow 2 - &4 * a * c)) * inv (&2 * a) < &0 * inv (&2 * a)`
+      ASSUME_TAC THENL
+     [MATCH_MP_TAC REAL_LT_RMUL THEN CONJ_TAC THENL
+       [ONCE_REWRITE_TAC
+          [REAL_FIELD
+             `(--b + sqrt (b pow 2 - &4 * a * c) < &0) = (sqrt (b pow 2 - &4 * a * c) < b)`] THEN
+        ASM_SIMP_TAC [];
+        MATCH_MP_TAC REAL_INV_POS THEN ASM_REWRITE_TAC []];
+      UNDISCH_TAC
+        `(--b + sqrt (b pow 2 - &4 * a * c)) * inv (&2 * a) < &0 * inv (&2 * a)` THEN
+      SIMP_TAC [] THEN ASM_REWRITE_TAC [NOT_IN_EMPTY]]]);;
+
+(*======================================================================*)
+(*                        Real Roots (Case 2)                           *)
+(*             a < 0  /\ b < sqrt (b pow 2 - &4 * a * c)                *)
+(*======================================================================*)
+ 
+let QUAD_REAL_CASE2  = prove
+ (`!(a:real) (b:real) (c:real). 
+   ~(Cx(&0) = Cx a) /\  
+    (&0 < (b pow 2 - &4 * a * c)) /\ 
+    (b < sqrt (b pow 2 - &4 * a * c)) /\ 
+    (a < &0)  ==>
+    (is_stable_macro_mini_rob_sys (\x:complex. Cx a * x pow 2 + Cx b * x + Cx c) )`,
+  REPEAT GEN_TAC THEN REPEAT STRIP_TAC THEN 
+  ONCE_REWRITE_TAC [is_stable_macro_mini_rob_sys] THEN
+  SIMP_TAC [EXTENSION] THEN REWRITE_TAC [IN_ELIM_THM] THEN
+  SUBGOAL_THEN
+    `!x:complex. ((Cx a * x pow 2 + Cx b * x + Cx c = Cx (&0)) = (x =
+              (Cx (--b) + csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) \/
+              x =
+              (Cx (--b) - csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) ) )`
+    ASSUME_TAC THENL
+   [REPEAT GEN_TAC THEN MATCH_MP_TAC QUADRATIC_FORMULA THEN ASM_SIMP_TAC [];
+    ALL_TAC] THEN
+  ONCE_ASM_REWRITE_TAC [] THEN ONCE_ASM_REWRITE_TAC [NOT_FORALL_THM] THEN
+  EXISTS_TAC
+    `(Cx (--b) + csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+          (Cx (&2) * Cx a)` THEN
+  ASM_REWRITE_TAC [] THEN REWRITE_TAC [complex_div] THEN
+  REWRITE_TAC [COMPLEX_ADD_RDISTRIB] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_INV] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_MUL] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  ONCE_REWRITE_TAC [GSYM CX_POW] THEN REWRITE_TAC [GSYM CX_SUB] THEN
+  SUBGOAL_THEN
+    `csqrt (Cx (b pow 2 - &4 * a * c)) = Cx (sqrt (b pow 2 - &4 * a * c))`
+    ASSUME_TAC THENL
+   [REWRITE_TAC [EQ_SYM_EQ] THEN MATCH_MP_TAC CX_SQRT THEN
+    REWRITE_TAC [REAL_LE_LT] THEN UNDISCH_TAC `&0 < b pow 2 - &4 * a * c` THEN
+    SIMP_TAC [];
+    ALL_TAC] THEN
+  POP_ASSUM MP_TAC THEN SIMP_TAC [] THEN DISCH_TAC THEN
+  REWRITE_TAC [GSYM CX_MUL] THEN REWRITE_TAC [GSYM CX_ADD] THEN
+  REWRITE_TAC [RE_CX] THEN
+  ONCE_REWRITE_TAC [REAL_RING `--a * c + (b:real) * c = (--a + b) * c`] THEN
+  SUBGOAL_THEN `~( Cx (&0) = (Cx (&2) * Cx a))` ASSUME_TAC THENL
+   [SUBGOAL_THEN `( ( Cx (&0) = (Cx (&2) * Cx a)) = ( Cx (&0) = Cx (a) ) )`
+      ASSUME_TAC THENL
+     [ALL_TAC;
+      POP_ASSUM MP_TAC THEN SIMP_TAC [] THEN DISCH_TAC THEN
+      POP_ASSUM (K ALL_TAC) THEN ONCE_ASM_REWRITE_TAC [] THEN
+      ONCE_ASM_REWRITE_TAC []] THEN
+    EQ_TAC THEN DISCH_TAC THENL
+     [ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(Cx (&0) = Cx a )=(Cx (&0) = (Cx (&2) /Cx (&2))  * Cx a)`] THEN
+      REWRITE_TAC [complex_div] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC] THEN
+      SUBGOAL_THEN
+        `Cx (&2) * inv (Cx (&2)) * Cx a = (Cx (&2) * Cx a) * inv (Cx (&2))`
+        ASSUME_TAC THENL
+       [ALL_TAC;
+        UNDISCH_TAC
+          `Cx (&2) * inv (Cx (&2)) * Cx a = (Cx (&2) * Cx a) * inv (Cx (&2))` THEN
+        SIMP_TAC [] THEN DISCH_TAC THEN REWRITE_TAC [GSYM complex_div] THEN
+        SUBGOAL_THEN `~(Cx (&2) = Cx (&0))` ASSUME_TAC THENL
+         [ALL_TAC;
+          UNDISCH_TAC `~(Cx (&2) = Cx (&0))` THEN
+          SIMP_TAC [COMPLEX_EQ_RDIV_EQ] THEN DISCH_TAC THEN
+          SIMP_TAC [COMPLEX_EQ_RDIV_EQ] THEN
+          SUBGOAL_THEN `Cx (&0) * Cx (&2) = Cx (&0)` ASSUME_TAC THENL
+           [ALL_TAC;
+            UNDISCH_TAC `Cx (&0) * Cx (&2) = Cx (&0)` THEN SIMP_TAC [] THEN
+            DISCH_TAC THEN ONCE_ASM_REWRITE_TAC []]]];
+      SUBGOAL_THEN `~(Cx (&2) = Cx (&0))` ASSUME_TAC THENL
+       [ALL_TAC;
+        UNDISCH_TAC `~(Cx (&2) = Cx (&0))` THEN
+        SIMP_TAC [GSYM COMPLEX_EQ_LDIV_EQ] THEN DISCH_TAC THEN
+        REWRITE_TAC [complex_div] THEN UNDISCH_TAC `(Cx (&0) = Cx a)` THEN
+        SIMP_TAC [GSYM COMPLEX_EQ_LDIV_EQ]]] THEN
+    SIMPLE_COMPLEX_ARITH_TAC;
+    SUBGOAL_THEN `&2 * a < &0` ASSUME_TAC THENL
+     [REWRITE_TAC [REAL_MUL_SYM] THEN SUBGOAL_THEN `&0 < &2` ASSUME_TAC THENL
+       [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+      UNDISCH_TAC `&0 < &2` THEN SIMP_TAC [GSYM REAL_LT_RDIV_EQ] THEN
+      ONCE_REWRITE_TAC [SIMPLE_COMPLEX_ARITH `&0 / &2 = &0`] THEN DISCH_TAC THEN
+      ASM_MESON_TAC [];
+      UNDISCH_TAC `&2 * a < &0` THEN REWRITE_TAC [GSYM real_div] THEN
+      SIMP_TAC [DENOM_LT_0] THEN DISCH_TAC THEN
+      ONCE_REWRITE_TAC [SIMPLE_COMPLEX_ARITH `(&2 * a) * &0 = &0`] THEN
+      ONCE_REWRITE_TAC [REAL_ARITH `(&0 < --(a:real) + b) = (&0 < b + --a)`] THEN
+      REWRITE_TAC [GSYM REAL_LT_SUB_RADD] THEN
+      ONCE_REWRITE_TAC [REAL_ARITH `(&0 - --(a:real) =  a)`] THEN
+      ONCE_ASM_REWRITE_TAC [] THEN ASM_MESON_TAC [NOT_IN_EMPTY]]]);;
+
+(*======================================================================*)
+(*                        Real Roots (Case 3)                           *)
+(*             0 < b/a  /\ (b pow 2 - &4 * a * c) = 0                   *)
+(*======================================================================*)
+
+let QUAD_REAL_CASE3 = prove
+ (`!(a:real) (b:real) (c:real). 
+ ~(Cx(&0) = Cx(a))  /\ 
+  ((b pow 2 - &4 * a * c) = &0) /\
+  (&0 < b / a)  ==> 
+  (is_stable_macro_mini_rob_sys (\x:complex. Cx a * x pow 2 + Cx b * x + Cx c) )`,
+  REPEAT GEN_TAC THEN REPEAT STRIP_TAC THEN 
+  ONCE_REWRITE_TAC [is_stable_macro_mini_rob_sys] THEN
+  SIMP_TAC [EXTENSION] THEN REWRITE_TAC [IN_ELIM_THM] THEN
+  SUBGOAL_THEN
+    `!x:complex. ((Cx a * x pow 2 + Cx b * x + Cx c = Cx (&0)) = (x =
+              (Cx (--b) + csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) \/
+              x =
+              (Cx (--b) - csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) ) )`
+    ASSUME_TAC THENL
+   [REPEAT GEN_TAC THEN MATCH_MP_TAC QUADRATIC_FORMULA THEN
+    ONCE_ASM_REWRITE_TAC [] THEN MESON_TAC [];
+    ALL_TAC] THEN
+  ONCE_ASM_REWRITE_TAC [] THEN ONCE_ASM_REWRITE_TAC [NOT_FORALL_THM] THEN
+  EXISTS_TAC
+    `(Cx (--b) + csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+          (Cx (&2) * Cx a)` THEN
+  ASM_REWRITE_TAC [] THEN REWRITE_TAC [complex_div] THEN
+  REWRITE_TAC [COMPLEX_ADD_RDISTRIB] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_INV] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_MUL] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  ONCE_REWRITE_TAC [GSYM CX_POW] THEN REWRITE_TAC [GSYM CX_SUB] THEN
+  UNDISCH_TAC `b pow 2 - &4 * a * c = &0` THEN SIMP_TAC [] THEN
+  SIMP_TAC [CSQRT_0] THEN
+  ONCE_REWRITE_TAC [SIMPLE_COMPLEX_ARITH `(Cx(&0) *(a:complex) = Cx(&0)  )`] THEN
+  REWRITE_TAC [RE_CX] THEN
+  ONCE_REWRITE_TAC
+    [SIMPLE_COMPLEX_ARITH `(--b * (c:real)  + &0 = --b * c  )`] THEN
+  SUBGOAL_THEN `--b * inv (&2 * a) < &0` ASSUME_TAC THENL
+   [REWRITE_TAC [REAL_INV_MUL] THEN
+    ONCE_REWRITE_TAC
+      [SIMPLE_COMPLEX_ARITH `(--b * (c:real) * d = (--b * d) * c  )`] THEN
+    SUBGOAL_THEN `&0 < inv (&2)` ASSUME_TAC THENL
+     [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+    UNDISCH_TAC `&0 < inv (&2)` THEN SIMP_TAC [GSYM REAL_LT_RDIV_EQ] THEN
+    DISCH_TAC THEN
+    ONCE_REWRITE_TAC [SIMPLE_COMPLEX_ARITH `(&0 / (c:real) = &0  )`] THEN
+    REWRITE_TAC [GSYM REAL_NEG_LMUL] THEN REWRITE_TAC [REAL_NEG_LT0] THEN
+    ASM_MESON_TAC [real_div];
+    REWRITE_TAC [GSYM CX_ADD] THEN REWRITE_TAC [RE_CX] THEN
+    ONCE_REWRITE_TAC [SIMPLE_COMPLEX_ARITH `(--(a:real)*b + &0 = --a*b   )`] THEN
+    DISCH_TAC THEN ONCE_ASM_REWRITE_TAC [] THEN ASM_MESON_TAC [NOT_IN_EMPTY]]);;
+
+(*======================================================================*)
+(*                        Real Roots (Case 4)                           *)
+(*                    For x = -b - sqrt (x)/ 2 a                        *)
+(*             0 < a  /\ sqrt (b pow 2 - &4 * a * c) < --b              *)
+(*======================================================================*)
+
+let QUAD_REAL_CASE4  = prove
+ (`!(a:real) (b:real) (c:real). 
+  ~(Cx(&0) = Cx a) /\
+   (&0 < (b pow 2 - &4 * a * c)) /\ 
+   (sqrt (b pow 2 - &4 * a * c) < --b ) /\ 
+   (a < &0)  ==> 
+(is_stable_macro_mini_rob_sys (\x:complex. Cx(a)* x pow 2 + Cx(b) * x + Cx(c)) )`,
+  REPEAT GEN_TAC THEN REPEAT STRIP_TAC THEN 
+  ONCE_REWRITE_TAC [is_stable_macro_mini_rob_sys] THEN
+  SIMP_TAC [EXTENSION] THEN REWRITE_TAC [IN_ELIM_THM] THEN
+  SUBGOAL_THEN
+    `!x:complex. ((Cx a * x pow 2 + Cx b * x + Cx c = Cx (&0)) = (x =
+              (Cx (--b) + csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) \/
+              x =
+              (Cx (--b) - csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) ) )`
+    ASSUME_TAC THENL
+   [REPEAT GEN_TAC THEN MATCH_MP_TAC QUADRATIC_FORMULA THEN
+    ONCE_ASM_REWRITE_TAC [] THEN MESON_TAC [];
+    ALL_TAC] THEN
+  ONCE_ASM_REWRITE_TAC [] THEN ONCE_ASM_REWRITE_TAC [NOT_FORALL_THM] THEN
+  EXISTS_TAC
+    `(Cx (--b) - csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+          (Cx (&2) * Cx a)` THEN
+  ASM_REWRITE_TAC [] THEN REWRITE_TAC [complex_div] THEN
+  REWRITE_TAC [COMPLEX_SUB_RDISTRIB] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_INV] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_MUL] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  ONCE_REWRITE_TAC [GSYM CX_POW] THEN REWRITE_TAC [GSYM CX_SUB] THEN
+  SUBGOAL_THEN
+    `csqrt (Cx (b pow 2 - &4 * a * c)) = Cx (sqrt (b pow 2 - &4 * a * c))`
+    ASSUME_TAC THENL
+   [REWRITE_TAC [EQ_SYM_EQ] THEN MATCH_MP_TAC CX_SQRT THEN
+    REWRITE_TAC [REAL_LE_LT] THEN UNDISCH_TAC `&0 < b pow 2 - &4 * a * c` THEN
+    SIMP_TAC [];
+    ALL_TAC] THEN
+  UNDISCH_TAC
+    `csqrt (Cx (b pow 2 - &4 * a * c)) = Cx (sqrt (b pow 2 - &4 * a * c))` THEN
+  SIMP_TAC [] THEN DISCH_TAC THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_SUB] THEN REWRITE_TAC [RE_CX] THEN
+  ONCE_REWRITE_TAC [REAL_RING `--a * c - (b:real) * c = (--a - b) * c`] THEN
+  SUBGOAL_THEN `~( Cx (&0) = (Cx (&2) * Cx a))` ASSUME_TAC THENL
+   [SUBGOAL_THEN `Cx (&0) = Cx (&2) * Cx a <=> Cx (&0) = Cx a` ASSUME_TAC THENL
+     [ALL_TAC;
+      UNDISCH_TAC `Cx (&0) = Cx (&2) * Cx a <=> Cx (&0) = Cx a` THEN
+      SIMP_TAC [] THEN DISCH_TAC THEN POP_ASSUM (K ALL_TAC) THEN
+      ONCE_ASM_REWRITE_TAC [] THEN ONCE_ASM_REWRITE_TAC []] THEN
+    EQ_TAC THEN DISCH_TAC THENL
+     [ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(Cx (&0) = Cx a )=(Cx (&0) = (Cx (&2) /Cx (&2))  * Cx a)`] THEN
+      REWRITE_TAC [complex_div] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC] THEN
+      SUBGOAL_THEN
+        `Cx (&2) * inv (Cx (&2)) * Cx a = (Cx (&2) * Cx a) * inv (Cx (&2))`
+        ASSUME_TAC THENL
+       [ALL_TAC;
+        UNDISCH_TAC
+          `Cx (&2) * inv (Cx (&2)) * Cx a = (Cx (&2) * Cx a) * inv (Cx (&2))` THEN
+        SIMP_TAC [] THEN DISCH_TAC THEN REWRITE_TAC [GSYM complex_div] THEN
+        SUBGOAL_THEN `~(Cx (&2) = Cx (&0))` ASSUME_TAC THENL
+         [ALL_TAC;
+          UNDISCH_TAC `~(Cx (&2) = Cx (&0))` THEN
+          SIMP_TAC [COMPLEX_EQ_RDIV_EQ] THEN DISCH_TAC THEN
+          SIMP_TAC [COMPLEX_EQ_RDIV_EQ] THEN
+          SUBGOAL_THEN `Cx (&0) * Cx (&2) = Cx (&0)` ASSUME_TAC THENL
+           [ALL_TAC;
+            UNDISCH_TAC `Cx (&0) * Cx (&2) = Cx (&0)` THEN SIMP_TAC [] THEN
+            DISCH_TAC THEN ONCE_ASM_REWRITE_TAC []]]];
+      SUBGOAL_THEN `~(Cx (&2) = Cx (&0))` ASSUME_TAC THENL
+       [ALL_TAC;
+        UNDISCH_TAC `~(Cx (&2) = Cx (&0))` THEN
+        SIMP_TAC [GSYM COMPLEX_EQ_LDIV_EQ] THEN DISCH_TAC THEN
+        REWRITE_TAC [complex_div] THEN UNDISCH_TAC `(Cx (&0) = Cx a)` THEN
+        SIMP_TAC [GSYM COMPLEX_EQ_LDIV_EQ]]] THEN
+    SIMPLE_COMPLEX_ARITH_TAC;
+    SUBGOAL_THEN `&2 * a < &0` ASSUME_TAC THENL
+     [REWRITE_TAC [REAL_MUL_SYM] THEN SUBGOAL_THEN `&0 < &2` ASSUME_TAC THENL
+       [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+      UNDISCH_TAC `&0 < &2` THEN SIMP_TAC [GSYM REAL_LT_RDIV_EQ] THEN
+      ONCE_REWRITE_TAC [SIMPLE_COMPLEX_ARITH `&0 / &2 = &0`] THEN DISCH_TAC THEN
+      ASM_MESON_TAC [];
+      UNDISCH_TAC `&2 * a < &0` THEN REWRITE_TAC [GSYM real_div] THEN
+      ASM_SIMP_TAC [DENOM_LT_0] THEN DISCH_TAC THEN
+      ONCE_REWRITE_TAC [SIMPLE_COMPLEX_ARITH `(&2 * a) * &0 = &0`] THEN
+      ONCE_REWRITE_TAC [REAL_ARITH `(&0 < --(a:real) - b) = (b < --a )`] THEN
+      REWRITE_TAC [GSYM REAL_LT_SUB_RADD] THEN
+      ONCE_REWRITE_TAC [REAL_ARITH `(&0 - --(a:real) =  a)`] THEN
+      ONCE_ASM_REWRITE_TAC [] THEN ASM_MESON_TAC [NOT_IN_EMPTY]]]);;
+
+(*======================================================================*)
+(*                        Real Roots (Case 5)                           *)
+(*             0 < a  /\ --b < (b pow 2 - &4 * a * c)                   *)
+(*======================================================================*)
+
+let QUAD_REAL_CASE5  = prove
+ (`!(a:real) (b:real) (c:real). 
+  ~(Cx (&0) = Cx a) /\
+   ((&0) < (b pow 2 - &4 * a * c)) /\
+   (--b < sqrt (b pow 2 - &4 * a * c) ) /\
+   (&0 < a)  ==> 
+   (is_stable_macro_mini_rob_sys (\x:complex. Cx a * x pow 2 + Cx b * x + Cx c) )`,
+  REPEAT GEN_TAC THEN REPEAT STRIP_TAC THEN 
+  ONCE_REWRITE_TAC [is_stable_macro_mini_rob_sys] THEN
+  SIMP_TAC [EXTENSION] THEN REWRITE_TAC [IN_ELIM_THM] THEN
+  SUBGOAL_THEN
+    `!x:complex. ((Cx a * x pow 2 + Cx b * x + Cx c = Cx (&0)) = (x =
+              (Cx (--b) + csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) \/
+              x =
+              (Cx (--b) - csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) ) )`
+    ASSUME_TAC THENL
+   [REPEAT GEN_TAC THEN MATCH_MP_TAC QUADRATIC_FORMULA THEN
+    ONCE_ASM_REWRITE_TAC [] THEN MESON_TAC [];
+    ALL_TAC] THEN
+  ONCE_ASM_REWRITE_TAC [] THEN ONCE_ASM_REWRITE_TAC [NOT_FORALL_THM] THEN
+  EXISTS_TAC
+    `(Cx (--b) - csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+          (Cx (&2) * Cx a)` THEN
+  ASM_REWRITE_TAC [] THEN REWRITE_TAC [complex_div] THEN
+  REWRITE_TAC [COMPLEX_SUB_RDISTRIB] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_INV] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_MUL] THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  ONCE_REWRITE_TAC [GSYM CX_POW] THEN REWRITE_TAC [GSYM CX_SUB] THEN
+  SUBGOAL_THEN
+    `csqrt (Cx (b pow 2 - &4 * a * c)) = Cx (sqrt (b pow 2 - &4 * a * c))`
+    ASSUME_TAC THENL
+   [REWRITE_TAC [EQ_SYM_EQ] THEN MATCH_MP_TAC CX_SQRT THEN
+    REWRITE_TAC [REAL_LE_LT] THEN UNDISCH_TAC `&0 < b pow 2 - &4 * a * c` THEN
+    SIMP_TAC [];
+    ALL_TAC] THEN
+  UNDISCH_TAC
+    `csqrt (Cx (b pow 2 - &4 * a * c)) = Cx (sqrt (b pow 2 - &4 * a * c))` THEN
+  SIMP_TAC [] THEN DISCH_TAC THEN REWRITE_TAC [GSYM CX_MUL] THEN
+  REWRITE_TAC [GSYM CX_SUB] THEN REWRITE_TAC [RE_CX] THEN
+  ONCE_REWRITE_TAC [REAL_RING `--a * c - (b:real) * c = (--a - b) * c`] THEN
+  SUBGOAL_THEN `~( Cx (&0) = (Cx (&2) * Cx a))` ASSUME_TAC THENL
+   [SUBGOAL_THEN `Cx (&0) = Cx (&2) * Cx a <=> Cx (&0) = Cx a` ASSUME_TAC THENL
+     [ALL_TAC;
+      UNDISCH_TAC `Cx (&0) = Cx (&2) * Cx a <=> Cx (&0) = Cx a` THEN
+      SIMP_TAC [] THEN DISCH_TAC THEN POP_ASSUM (K ALL_TAC) THEN
+      ONCE_ASM_REWRITE_TAC [] THEN ONCE_ASM_REWRITE_TAC []] THEN
+    EQ_TAC THEN DISCH_TAC THENL
+     [ONCE_REWRITE_TAC
+        [SIMPLE_COMPLEX_ARITH
+           `(Cx (&0) = Cx a )=(Cx (&0) = (Cx (&2) /Cx (&2))  * Cx a)`] THEN
+      REWRITE_TAC [complex_div] THEN
+      ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC] THEN
+      SUBGOAL_THEN
+        `Cx (&2) * inv (Cx (&2)) * Cx a = (Cx (&2) * Cx a) * inv (Cx (&2))`
+        ASSUME_TAC THENL
+       [ALL_TAC;
+        UNDISCH_TAC
+          `Cx (&2) * inv (Cx (&2)) * Cx a = (Cx (&2) * Cx a) * inv (Cx (&2))` THEN
+        SIMP_TAC [] THEN DISCH_TAC THEN REWRITE_TAC [GSYM complex_div] THEN
+        SUBGOAL_THEN `~(Cx (&2) = Cx (&0))` ASSUME_TAC THENL
+         [ALL_TAC;
+          UNDISCH_TAC `~(Cx (&2) = Cx (&0))` THEN
+          SIMP_TAC [COMPLEX_EQ_RDIV_EQ] THEN DISCH_TAC THEN
+          SIMP_TAC [COMPLEX_EQ_RDIV_EQ] THEN
+          SUBGOAL_THEN `Cx (&0) * Cx (&2) = Cx (&0)` ASSUME_TAC THENL
+           [ALL_TAC;
+            UNDISCH_TAC `Cx (&0) * Cx (&2) = Cx (&0)` THEN SIMP_TAC [] THEN
+            DISCH_TAC THEN ONCE_ASM_REWRITE_TAC []]]];
+      SUBGOAL_THEN `~(Cx (&2) = Cx (&0))` ASSUME_TAC THENL
+       [ALL_TAC;
+        UNDISCH_TAC `~(Cx (&2) = Cx (&0))` THEN
+        SIMP_TAC [GSYM COMPLEX_EQ_LDIV_EQ] THEN DISCH_TAC THEN
+        REWRITE_TAC [complex_div] THEN UNDISCH_TAC `(Cx (&0) = Cx a)` THEN
+        SIMP_TAC [GSYM COMPLEX_EQ_LDIV_EQ]]] THEN
+    SIMPLE_COMPLEX_ARITH_TAC;
+    SIMP_TAC [GSYM CX_MUL] THEN SIMP_TAC [CX_INJ] THEN
+    SUBGOAL_THEN `&0 < &2*a` ASSUME_TAC THENL
+     [MATCH_MP_TAC REAL_LT_MUL THEN ASM_REWRITE_TAC [] THEN
+      SIMPLE_COMPLEX_ARITH_TAC;
+      ALL_TAC] THEN
+    ONCE_REWRITE_TAC [SIMPLE_COMPLEX_ARITH `((&0)) = ((&0) * inv (&2 * a))`] THEN
+    SUBGOAL_THEN
+      `(--b - sqrt (b pow 2 - &4 * a * c)) * inv (&2 * a) < &0 * inv (&2 * a)`
+      ASSUME_TAC THENL
+     [MATCH_MP_TAC REAL_LT_RMUL THEN CONJ_TAC THENL
+       [ONCE_REWRITE_TAC [REAL_FIELD `(--(x:real) - y < (&0)) = (--x < y)`];
+        MATCH_MP_TAC REAL_INV_POS] THEN
+      ASM_REWRITE_TAC [];
+      UNDISCH_TAC
+        `(--b - sqrt (b pow 2 - &4 * a * c)) * inv (&2 * a) < &0 * inv (&2 * a)` THEN
+      SIMP_TAC [] THEN ASM_REWRITE_TAC [NOT_IN_EMPTY]]]);;
+
+(*======================================================================*)
+(*                         Imaginary Roots                              *)
+(*                  For x = -b +/- sqrt (x)/ 2 a                        *)
+(*           0 < b/a  /\ (b pow 2 - &4 * a * c) < 0                     *)
+(*======================================================================*)
+
+let QUAD_IMAG_CASE = prove
+ (`!(a:real) (b:real) (c:real). 
+ ~(Cx (&0) = Cx a)  /\ 
+  ((b pow 2 - &4 * a * c) < &0)/\ 
+  (&0 < b / a) ==> 
+  (is_stable_macro_mini_rob_sys (\x:complex. Cx a * x pow 2 + Cx b * x + Cx c) )`,
+  REPEAT GEN_TAC THEN REPEAT STRIP_TAC THEN 
+  ONCE_REWRITE_TAC [is_stable_macro_mini_rob_sys] THEN
+  SIMP_TAC [EXTENSION] THEN REWRITE_TAC [IN_ELIM_THM] THEN
+  SUBGOAL_THEN
+    `!x:complex. ((Cx a * x pow 2 + Cx b * x + Cx c = Cx (&0)) = (x =
+              (Cx (--b) + csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) \/
+              x =
+              (Cx (--b) - csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+              (Cx (&2) * Cx a) ) )`
+    ASSUME_TAC THENL
+   [REPEAT GEN_TAC THEN MATCH_MP_TAC QUADRATIC_FORMULA THEN
+    ONCE_ASM_REWRITE_TAC [] THEN MESON_TAC [];
+    ALL_TAC] THEN
+  ONCE_ASM_REWRITE_TAC [] THEN ONCE_ASM_REWRITE_TAC [NOT_FORALL_THM] THEN
+  EXISTS_TAC
+    `(Cx (--b) + csqrt (Cx b pow 2 - Cx (&4) * Cx a * Cx c)) /
+          (Cx (&2) * Cx a)` THEN
+  ASM_REWRITE_TAC [] THEN ONCE_REWRITE_TAC [GSYM CX_MUL] THEN
+  ONCE_REWRITE_TAC [GSYM CX_MUL] THEN ONCE_REWRITE_TAC [GSYM CX_POW] THEN
+  REWRITE_TAC [GSYM CX_SUB] THEN
+  SUBGOAL_THEN `((b pow 2 - &4 *( a:real) * c) = --(&4 * a * c -  b pow 2))`
+    ASSUME_TAC THENL
+   [ONCE_REWRITE_TAC [REAL_NEG_SUB] THEN SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+  ONCE_ASM_REWRITE_TAC [] THEN
+  SUBGOAL_THEN `--(&4 * a * c - b pow 2) = -- &1 * (&4 * a * c - b pow 2)`
+    ASSUME_TAC THENL
+   [ONCE_REWRITE_TAC [GSYM REAL_NEG_MINUS1] THEN SIMPLE_COMPLEX_ARITH_TAC;
+    ALL_TAC] THEN
+  UNDISCH_TAC `--(&4 * a * c - b pow 2) = -- &1 * (&4 * a * c - b pow 2)` THEN
+  SIMP_TAC [] THEN DISCH_TAC THEN ONCE_REWRITE_TAC [CX_MUL] THEN
+  ONCE_REWRITE_TAC [CX_NEG] THEN ONCE_REWRITE_TAC [GSYM COMPLEX_POW_II_2] THEN
+  SUBGOAL_THEN
+    `Cx (&4 * a * c - b pow 2)  = (csqrt ( Cx (&4 * a * c - b pow 2) ))pow 2`
+    ASSUME_TAC THENL
+   [ONCE_REWRITE_TAC [CSQRT] THEN SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+  ONCE_ASM_REWRITE_TAC [] THEN ONCE_REWRITE_TAC [GSYM COMPLEX_POW_MUL] THEN
+  SUBGOAL_THEN
+    `csqrt ((ii * csqrt (Cx (&4 * a * c - b pow 2))) pow 2) = (ii * csqrt (Cx (&4 * a * c - b pow 2)))`
+    ASSUME_TAC THENL
+   [MATCH_MP_TAC POW_2_CSQRT THEN DISJ2_TAC THEN CONJ_TAC THENL
+     [SUBGOAL_THEN
+        `(ii * csqrt (Cx (&4 * a * c - b pow 2))) = ( csqrt (Cx (&4 * a * c - b pow 2)) * ii )`
+        ASSUME_TAC THENL
+       [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+      ONCE_ASM_REWRITE_TAC [] THEN ONCE_REWRITE_TAC [RE_MUL_II] THEN
+      SUBGOAL_THEN
+        `csqrt (Cx (&4 * a * c - b pow 2)) =
+   		  (Cx (sqrt(&4 * a * c - b pow 2)))`
+        ASSUME_TAC THENL
+       [ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN MATCH_MP_TAC CX_SQRT THEN
+        ONCE_REWRITE_TAC [REAL_LE_LT] THEN DISJ1_TAC THEN
+        ONCE_REWRITE_TAC [GSYM REAL_NEG_SUB] THEN
+        UNDISCH_TAC `b pow 2 - &4 * a * c < &0` THEN CONV_TAC REAL_FIELD;
+        ONCE_ASM_REWRITE_TAC [] THEN ONCE_REWRITE_TAC [IM_CX] THEN
+        SIMPLE_COMPLEX_ARITH_TAC];
+      SUBGOAL_THEN
+        `csqrt (Cx (&4 * a * c - b pow 2)) =
+   		  (Cx (sqrt(&4 * a * c - b pow 2)))`
+        ASSUME_TAC THENL
+       [ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN MATCH_MP_TAC CX_SQRT THEN
+        ONCE_REWRITE_TAC [REAL_LE_LT] THEN DISJ1_TAC THEN
+        ONCE_REWRITE_TAC [GSYM REAL_NEG_SUB];
+        ONCE_ASM_REWRITE_TAC [] THEN ONCE_REWRITE_TAC [REAL_LE_LT] THEN
+        DISJ1_TAC THEN ONCE_REWRITE_TAC [COMPLEX_MUL_SYM] THEN
+        ONCE_REWRITE_TAC [IM_MUL_II] THEN ONCE_REWRITE_TAC [RE_CX] THEN
+        MATCH_MP_TAC SQRT_POS_LT] THEN
+      UNDISCH_TAC `b pow 2 - &4 * a * c < &0` THEN CONV_TAC REAL_FIELD];
+    POP_ASSUM MP_TAC THEN SIMP_TAC [] THEN DISCH_TAC THEN
+    SUBGOAL_THEN
+      `csqrt (Cx (&4 * a * c - b pow 2)) =
+   		  (Cx (sqrt(&4 * a * c - b pow 2)))`
+      ASSUME_TAC THENL
+     [ONCE_REWRITE_TAC [EQ_SYM_EQ] THEN MATCH_MP_TAC CX_SQRT THEN
+      ONCE_REWRITE_TAC [REAL_LE_LT] THEN DISJ1_TAC THEN
+      ONCE_REWRITE_TAC [GSYM REAL_NEG_SUB] THEN
+      UNDISCH_TAC `b pow 2 - &4 * a * c < &0` THEN CONV_TAC REAL_FIELD;
+      ALL_TAC] THEN
+    POP_ASSUM MP_TAC THEN SIMP_TAC [] THEN DISCH_TAC THEN
+    ONCE_REWRITE_TAC [GSYM CX_MUL] THEN ONCE_REWRITE_TAC [GSYM CX_NEG] THEN
+    ONCE_REWRITE_TAC [complex_div] THEN
+    ONCE_REWRITE_TAC [COMPLEX_ADD_RDISTRIB] THEN
+    ONCE_REWRITE_TAC [GSYM CX_INV] THEN ONCE_REWRITE_TAC [GSYM CX_MUL] THEN
+    ONCE_REWRITE_TAC [GSYM COMPLEX_MUL_ASSOC] THEN
+    ONCE_REWRITE_TAC [GSYM CX_MUL] THEN ONCE_REWRITE_TAC [ii] THEN
+    ONCE_REWRITE_TAC [CX_DEF] THEN ONCE_REWRITE_TAC [complex_mul] THEN
+    ONCE_REWRITE_TAC [RE] THEN ONCE_REWRITE_TAC [IM] THEN
+    SUBGOAL_THEN
+      `(&0 * sqrt (&4 * a * c - b pow 2) * inv (&2 * a) - &1 * &0) = &0`
+      ASSUME_TAC THENL
+     [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+    ONCE_ASM_REWRITE_TAC [] THEN
+    SUBGOAL_THEN
+      `(&0 * &0 + &1 * sqrt (&4 * a * c - b pow 2) * inv (&2 * a) ) 
+  		     =  (sqrt (&4 * a * c - b pow 2) * inv (&2 * a))`
+      ASSUME_TAC THENL
+     [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+    ONCE_ASM_REWRITE_TAC [] THEN ONCE_REWRITE_TAC [complex_add] THEN
+    ONCE_REWRITE_TAC [RE] THEN ONCE_REWRITE_TAC [IM] THEN
+    ONCE_REWRITE_TAC [RE] THEN
+    ONCE_REWRITE_TAC
+      [REAL_ARITH
+         `(--b * inv (&2 * a) + &0 < &0) = (--b * inv (&2 * a) < &0)`] THEN
+    ONCE_REWRITE_TAC [REAL_INV_MUL] THEN
+    ONCE_REWRITE_TAC [REAL_ARITH `((a:real) * b * c) = ((a*c)*b)`] THEN
+    SUBGOAL_THEN `&0 < &2` ASSUME_TAC THENL
+     [SIMPLE_COMPLEX_ARITH_TAC; ALL_TAC] THEN
+    UNDISCH_TAC `&0 < &2` THEN ONCE_REWRITE_TAC [GSYM real_div] THEN
+    SIMP_TAC [REAL_LT_LDIV_EQ] THEN DISCH_TAC THEN
+    ONCE_REWRITE_TAC [REAL_ARITH `(&0 * &2) = (&0)`] THEN
+    ONCE_REWRITE_TAC [GSYM REAL_NEG_LMUL] THEN ONCE_REWRITE_TAC [real_div] THEN
+    ONCE_REWRITE_TAC [GSYM REAL_NEG_LMUL] THEN
+    ONCE_REWRITE_TAC [GSYM real_div] THEN
+    SUBGOAL_THEN `(--(b / a) < &0) = (&0 < b / a)` ASSUME_TAC THENL
+     [UNDISCH_TAC `&0 < b / a` THEN CONV_TAC REAL_FIELD;
+      ONCE_ASM_REWRITE_TAC [] THEN ASM_MESON_TAC [NOT_IN_EMPTY]]]);;
+
+(*============================================================================*)
+(*----Generalized theorem regarding stability of Macro-mini robotic system----*)
+(*============================================================================*)
+
+g ` !a b c.  
+  ~(Cx (&0) = Cx a) /\
+   (((&0 < b / a) /\ (((b pow 2 - &4 * a * c) < &0) \/ (b pow 2 - &4 * a * c = &0))) \/
+   ((&0 < b pow 2 - &4 * a * c)  /\
+       ((a < &0) /\ ((b < sqrt (b pow 2 - &4 * a * c) \/ (sqrt (b pow 2 - &4 * a * c) < --b)))  \/ 
+       ((&0 < a) /\ ((sqrt (b pow 2 - &4 * a * c) < b) \/ (--b < sqrt (b pow 2 - &4 * a * c)))) ) ) )
+        ==> is_stable_macro_mini_rob_sys (\x. Cx a * x pow 2 + Cx b * x + Cx c)`;;
+
+e (REPEAT STRIP_TAC);;
+e (MATCH_MP_TAC QUAD_IMAG_CASE );;
+e (ASM_SIMP_TAC []);;
+e (MATCH_MP_TAC QUAD_REAL_CASE3);;
+e (ASM_SIMP_TAC []);;
+e (MATCH_MP_TAC QUAD_REAL_CASE2);;
+e (ASM_SIMP_TAC []);;
+e (MATCH_MP_TAC QUAD_REAL_CASE4);;
+e (ASM_SIMP_TAC []);;
+e (MATCH_MP_TAC QUAD_REAL_CASE1);;
+e (ASM_SIMP_TAC []);;
+e (MATCH_MP_TAC QUAD_REAL_CASE5);;
+e (ASM_SIMP_TAC []);;
+
+let QUAD_STABLE_ALL_CASES_GEN_MACRO_MINI_ROB_SYS = top_thm();;
+
+(*==================================================================*)
+
+g `!a b c.  ~(Cx (&0) = Cx a) /\
+          (&0 < b / a /\
+          (b pow 2 - &4 * a * c < &0 \/
+           b pow 2 - &4 * a * c = &0) \/
+          &0 < b pow 2 - &4 * a * c /\
+          (&0 < a /\ (sqrt (b pow 2 - &4 * a * c) < b \/
+            -- b < sqrt (b pow 2 - &4 * a * c)))) 
+         ==> is_stable_macro_mini_rob_sys (\s. Cx a * s pow 2 + Cx b * s + Cx c)`;;
+
+e (REPEAT GEN_TAC THEN DISCH_TAC);;
+e (MATCH_MP_TAC QUAD_STABLE_ALL_CASES_GEN_PHRI);;
+e (POP_ASSUM MP_TAC THEN STRIP_TAC);;
+e (ASM_SIMP_TAC [IM_CX; RE_CX; CX_INJ]);;
+e (ASM_SIMP_TAC []);;
+e (ASM_SIMP_TAC []);;
+e (ASM_SIMP_TAC []);;
+
+let STABILITY_CONSRAINTS_GEN_ROB_SYS = top_thm ();;
+
+
+(*============================================================================*)
+(*============================================================================*)
+(*============================================================================*)
+
+
+g `!m1 m2 k1p k1d.
+           valid_macro_mini_rob_sys (m1,m2) /\
+           valid_macro_mini_cntlr k1p k1d /\
+          (&0 < k1d / m1 /\
+          (k1d pow 2 - &4 * m1 * k1p < &0 \/
+           k1d pow 2 - &4 * m1 * k1p = &0) \/
+          &0 < k1d pow 2 - &4 * m1 * k1p /\
+          (&0 < m1 /\ (sqrt (k1d pow 2 - &4 * m1 * k1p) < k1d \/
+            -- k1d < sqrt (k1d pow 2 - &4 * m1 * k1p)))) 
+         ==> is_stable_macro_mini_rob_sys (\s. Cx m1 * s pow 2 + Cx k1d * s + Cx k1p)`;;
+
+	 
+e (REWRITE_TAC [valid_macro_mini_rob_sys; valid_macro_mini_cntlr]);;
+e (SIMP_TAC [STABILITY_CONSRAINTS_GEN_ROB_SYS; CX_INJ]);;
+
+let STABLE_OLM_ROB_SYS = top_thm ();;
+
+(*---------------------------------------------------------------------------*)
+
+g `!m1 m2 k1p k1d.
+           valid_macro_mini_rob_sys (m1,m2) /\
+           valid_macro_mini_cntlr k1p k1d /\
+          (k1d pow 2 - &4 * m1 * k1p < &0 \/
+           k1d pow 2 - &4 * m1 * k1p = &0) \/
+          &0 < k1d pow 2 - &4 * m1 * k1p /\
+          (&0 < m1 /\ (sqrt (k1d pow 2 - &4 * m1 * k1p) < k1d \/
+            -- k1d < sqrt (k1d pow 2 - &4 * m1 * k1p)))) 
+         ==> is_stable_macro_mini_rob_sys (\s. Cx m1 * s pow 2 + Cx k1d * s + Cx k1p)`;;
+
+e (REWRITE_TAC [valid_macro_mini_rob_sys; valid_macro_mini_cntlr]);;
+e (REPEAT GEN_TAC THEN DISCH_TAC);;
+e (SUBGOAL_THEN `&0 < (&0 < k1d / m1)` ASSUME_TAC);;
+       e (MATCH_MP_TAC REAL_LT_DIV);;
+	   e (ASM_SIMP_TAC []);;
+
+e (REWRITE_TAC [REAL_MUL_POS_LT]);;
+e (ASM_SIMP_TAC []);;
+
+e (MATCH_MP_TAC STABILITY_CONSRAINTS_GEN_ROB_SYS);;
+e (ASM_SIMP_TAC []);;
+e (POP_ASSUM MP_TAC);;
+e (REWRITE_TAC [CX_INJ] THEN CONV_TAC REAL_FIELD);;
+
+let STABLE_MACRO_ROB_SYS_ALT = top_thm ();;
+
+
+
+(*===========================================================================*)
+(*                          End of the Verification                          *)
+(*===========================================================================*)
